@@ -34,16 +34,16 @@ export function CleProprietaire() {
 
 /** Visiteurs par jour (comptés sans rien garder de personnel, cf. server/visites.js). */
 function Visites() {
-  const [d, setD] = useState<{ jours: { jour: string; visiteurs: number; pages: number; rendus: number; refuses: number; tailnet: number }[] } | null>(null)
+  const [d, setD] = useState<{ jours: { jour: string; visiteurs: number; pages: number; rendus: number; rendusProprietaire?: number; refuses: number; tailnet: number }[] } | null>(null)
   useEffect(() => { void fetch('/api/visites').then(r => r.ok ? r.json() : null).then(setD).catch(() => {}) }, [])
   if (!d) return null
   return (
     <table className="text-[12px] mt-3 w-full" style={{ borderCollapse: 'collapse' }}>
       <thead><tr className="text-muted text-left">
-        <th>{t('Jour')}</th><th>{t('Visiteurs')}</th><th>{t('Pages vues')}</th><th>{t('Rendus lancés')}</th><th>{t('Refusés (limite)')}</th><th>{t('Pages tailnet')}</th>
+        <th>{t('Jour')}</th><th>{t('Visiteurs')}</th><th>{t('Pages vues')}</th><th>{t('Rendus visiteurs')}</th><th>{t('Rendus propriétaire')}</th><th>{t('Refusés (limite)')}</th><th>{t('Pages tailnet')}</th>
       </tr></thead>
       <tbody>{d.jours.slice(0, 14).map(j => (
-        <tr key={j.jour}><td>{j.jour}</td><td><b>{j.visiteurs}</b></td><td>{j.pages}</td><td>{j.rendus}</td><td>{j.refuses}</td><td>{j.tailnet}</td></tr>
+        <tr key={j.jour}><td>{j.jour}</td><td><b>{j.visiteurs}</b></td><td>{j.pages}</td><td><b>{j.rendus}</b></td><td>{j.rendusProprietaire ?? '—'}</td><td>{j.refuses}</td><td>{j.tailnet}</td></tr>
       ))}</tbody>
     </table>
   )

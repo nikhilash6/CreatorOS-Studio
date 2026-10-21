@@ -2103,7 +2103,18 @@ function grapheMix(job, motion, applied, skipped) {
      sans la branche visage, le visage sortait flou et sans traits. */
   mg['73'].inputs.detect_face = 'enable'
   mg['62'].inputs.face_strength = 0.5
-  mg['62'].inputs.frame_window_size = Math.ceil((motion.frames - 1) / 4) * 4 + 1
+  /* Longueur (21/10, #444-6mh5) : un driver de 30 s (481 images) en une seule
+     fenêtre ne tient pas sur la carte, 104 s par pas puis panne de mémoire. Le
+     driver est coupé à 153 images (9,6 s) ; jusqu'à 81 images une seule fenêtre,
+     plus propre sur un clip court, au-delà deux fenêtres qui se recouvrent d'une
+     image (2w − 1 ≥ n). Une fenêtre fixe de 77 sur 161 images en faisait trois :
+     229 images rendues, le clip livré durait 14 s au lieu de 10. */
+  const MIX_MAX_IMAGES = 153
+  const n = Math.min(motion.frames, MIX_MAX_IMAGES)
+  mg['63'].inputs.frame_load_cap = n
+  const pas4 = k => Math.ceil((k - 1) / 4) * 4 + 1
+  mg['62'].inputs.frame_window_size = n <= 81 ? pas4(n) : pas4((n + 1) / 2)
+  if (n < motion.frames) skipped.push(`driver coupé à ${MIX_MAX_IMAGES} images (9,6 s) sur ${motion.frames} : limite du Mix sur la démo`)
   // budget de pixels validé (~832×480), dans l'aspect du driver, multiple de 16
   const dv = videoSize(path.join(CONFIG.comfyInput, job.motionDriver))
   const BUDGET = 832 * 480, ar = dv.width && dv.height ? dv.width / dv.height : 480 / 832
@@ -2121,7 +2132,7 @@ function grapheMix(job, motion, applied, skipped) {
   } catch (e) {
     skipped.push(`masque automatique indisponible (${String(e.message || e).slice(0, 80)}) : points par défaut de la recette`)
   }
-  applied.push(`Mix WanAnimate : la still « ${motion.refName} » dans le décor du driver (${motion.frames} images), ${mw}×${mh}`)
+  applied.push(`Mix WanAnimate : la still « ${motion.refName} » dans le décor du driver (${n} images), ${mw}×${mh}`)
   return mg
 }
 
@@ -2302,6 +2313,11 @@ async function runJob(job, isRetry = false, connRetried = false) {
     let finalWorkflow = workflow
     if (job.videoEngine === 'motion' && job.motionMode === 'replace') {
       finalWorkflow = grapheMix(job, await buildMotionRef(job), applied, skipped)
+      /* Carte vidée avant Wan-Animate (21/10, #444-6mh5) : derrière le rendu Krea
+         de la référence, ou un rendu interrompu, les modèles restés chargés ne
+         laissent que des miettes au WanVideoWrapper — 104 s par pas puis panne
+         de mémoire au 10e pas. */
+      await comfy.freeMemory().catch(() => { /* non fatal */ })
     } else if (job.videoEngine === 'motion') {
       const motion = await buildMotionRef(job)
       const g = structuredClone(base)

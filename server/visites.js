@@ -33,7 +33,8 @@ export function installerVisites(app, { dataDir, estProprietaire, profondeurFile
   let sel = { jour: '', valeur: '' }, vus = new Set(), rendus = new Map()
   let sale = false
   const jourDe = () => new Date().toISOString().slice(0, 10)
-  const compteurs = j => (jours[j] ??= { visiteurs: 0, pages: 0, rendus: 0, refuses: 0, tailnet: 0 })
+  // rendus = visiteurs d'Internet ; rendusProprietaire = propriétaire et tailnet (depuis le 22/10)
+  const compteurs = j => (jours[j] ??= { visiteurs: 0, pages: 0, rendus: 0, rendusProprietaire: 0, refuses: 0, tailnet: 0 })
   const empreinte = req => {
     const j = jourDe()
     if (sel.jour !== j) { sel = { jour: j, valeur: crypto.randomBytes(16).toString('hex') }; vus = new Set(); rendus = new Map() }
@@ -59,7 +60,7 @@ export function installerVisites(app, { dataDir, estProprietaire, profondeurFile
     }
     if (!ROUTES_RENDU.has(`${req.method} ${req.routeOptions?.url}`)) return
     const c = compteurs(jourDe())
-    if (duTailnet(req) || estProprietaire(req)) { c.rendus++; sale = true; return }
+    if (duTailnet(req) || estProprietaire(req)) { c.rendusProprietaire = (c.rendusProprietaire ?? 0) + 1; sale = true; return }
     const e = empreinte(req), maintenant = Date.now()
     const recents = (rendus.get(e) ?? []).filter(t => maintenant - t < 3600_000)
     if (recents.length >= RENDUS_PAR_HEURE) {

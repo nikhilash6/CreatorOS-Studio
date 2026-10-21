@@ -175,7 +175,7 @@ app.post('/api/diagnostic/figer', async () => {
   return r
 })
 
-app.get('/api/health', async () => {
+app.get('/api/health', async req => {
   let comfyState = 'inatteignable'; let vram = null
   try {
     const s = await comfy.ping()
@@ -188,8 +188,9 @@ app.get('/api/health', async () => {
     queue: queueDepth(), recipes: RECIPES, swapWorkflow: null,
     videoEngines: VIDEO_ENGINES, defaultVideoEngine: DEFAULT_VIDEO_ENGINE,
     composerModels: CONFIG.composerModels,
-    workflowsDir: CONFIG.workflowsDir, promptsDir: CONFIG.promptsDir,
-    mediaDir: CONFIG.mediaDir, db: CONFIG.dbFile,
+    // chemins du serveur : au propriétaire seulement (la démo publique est sur Internet)
+    ...(estProprietaire(req) ? { workflowsDir: CONFIG.workflowsDir, promptsDir: CONFIG.promptsDir,
+      mediaDir: CONFIG.mediaDir, db: CONFIG.dbFile } : {}),
     ollamaUnload: CONFIG.ollamaUnload,
     // Studio verrouillé par une clé de propriétaire (le front masque l'édition).
     verrou: !!CONFIG.cleProprietaire,
