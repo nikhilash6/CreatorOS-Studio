@@ -1,0 +1,75 @@
+{
+ "src": {
+  "class_type": "VHS_LoadVideoPath",
+  "inputs": {
+   "video": "SOURCE.mp4",
+   "force_rate": 24,
+   "custom_width": 0,
+   "custom_height": 0,
+   "frame_load_cap": 1,
+   "skip_first_frames": 0,
+   "select_every_nth": 1,
+   "format": "None"
+  }
+ },
+ "img": {
+  "class_type": "ImageScale",
+  "inputs": {
+   "image": [
+    "src",
+    0
+   ],
+   "upscale_method": "lanczos",
+   "width": 352,
+   "height": 640,
+   "crop": "center"
+  }
+ },
+ "m": {
+  "class_type": "LoadMoGeModel",
+  "inputs": {
+   "model_name": "moge_2_vitl_normal_fp16.safetensors"
+  }
+ },
+ "geo": {
+  "class_type": "MoGeInference",
+  "inputs": {
+   "moge_model": [
+    "m",
+    0
+   ],
+   "image": [
+    "img",
+    0
+   ],
+   "resolution_level": 6,
+   "fov_x_degrees": 0,
+   "batch_size": 1,
+   "force_projection": true,
+   "apply_mask": true
+  }
+ },
+ "mesh": {
+  "class_type": "MoGePointMapToMesh",
+  "inputs": {
+   "moge_geometry": [
+    "geo",
+    0
+   ],
+   "batch_index": 0,
+   "decimation": 1,
+   "discontinuity_threshold": 0.04,
+   "texture": true
+  }
+ },
+ "save": {
+  "class_type": "SaveGLB",
+  "inputs": {
+   "mesh": [
+    "mesh",
+    0
+   ],
+   "filename_prefix": "creatoros/scene_exemple"
+  }
+ }
+}

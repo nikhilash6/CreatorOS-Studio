@@ -1223,7 +1223,7 @@ export function enqueueParole({ image, audio, texte, parentAssetId, personaId })
   return { id, blocs, duree }
 }
 
-function grapheParole(job, w, h) {
+export function grapheParole(job, w, h) {
   const texte = `She is talking to the camera with natural facial expressions and small head movements, her lips moving in sync with her words. ${job.composedPositive ?? ''}`.trim()
   const g = {
     unet: { class_type: 'UNETLoader', inputs: { unet_name: 'wan2.1_i2v_480p_14B_fp8_scaled.safetensors', weight_dtype: 'default' } },
@@ -1354,6 +1354,18 @@ export function enqueueReshoot({ source, angle, azimut, elevation, cles, texte, 
    Mise en cache par clip. Le GLB de ComfyUI embarque le graphe (chemins
    absolus compris) dans asset.extras : on le retire avant de le servir. */
 const scenesEnCours = new Map()
+/** Le graphe de la scène 3D : MoGe-2 sur la 1re image, maillage texturé, GLB. */
+export function grapheScene(src, W, H, prefixe) {
+  return {
+    src: { class_type: 'VHS_LoadVideoPath', inputs: { video: src, force_rate: 24, custom_width: 0, custom_height: 0, frame_load_cap: 1, skip_first_frames: 0, select_every_nth: 1, format: 'None' } },
+    img: { class_type: 'ImageScale', inputs: { image: ['src', 0], upscale_method: 'lanczos', width: W, height: H, crop: 'center' } },
+    m: { class_type: 'LoadMoGeModel', inputs: { model_name: 'moge_2_vitl_normal_fp16.safetensors' } },
+    geo: { class_type: 'MoGeInference', inputs: { moge_model: ['m', 0], image: ['img', 0], resolution_level: 6, fov_x_degrees: 0, batch_size: 1, force_projection: true, apply_mask: true } },
+    mesh: { class_type: 'MoGePointMapToMesh', inputs: { moge_geometry: ['geo', 0], batch_index: 0, decimation: 1, discontinuity_threshold: 0.04, texture: true } },
+    save: { class_type: 'SaveGLB', inputs: { mesh: ['mesh', 0], filename_prefix: prefixe } },
+  }
+}
+
 export function sceneReshoot(source) {
   if (!source || /[\\/]/.test(source) || source.startsWith('.')) throw new Error('fichier invalide')
   const dir = path.join(CONFIG.dataDir, 'reshoot_scenes'), dest = path.join(dir, `${source}.glb`)
@@ -1364,14 +1376,7 @@ export function sceneReshoot(source) {
     const d = videoSize(src)
     let W = 352, H = 640
     if (d.width && d.height) { if (d.width > d.height * 1.15) { W = 640; H = 352 } else if (d.width * 1.15 >= d.height) { W = 480; H = 480 } }
-    const g = {
-      src: { class_type: 'VHS_LoadVideoPath', inputs: { video: src, force_rate: 24, custom_width: 0, custom_height: 0, frame_load_cap: 1, skip_first_frames: 0, select_every_nth: 1, format: 'None' } },
-      img: { class_type: 'ImageScale', inputs: { image: ['src', 0], upscale_method: 'lanczos', width: W, height: H, crop: 'center' } },
-      m: { class_type: 'LoadMoGeModel', inputs: { model_name: 'moge_2_vitl_normal_fp16.safetensors' } },
-      geo: { class_type: 'MoGeInference', inputs: { moge_model: ['m', 0], image: ['img', 0], resolution_level: 6, fov_x_degrees: 0, batch_size: 1, force_projection: true, apply_mask: true } },
-      mesh: { class_type: 'MoGePointMapToMesh', inputs: { moge_geometry: ['geo', 0], batch_index: 0, decimation: 1, discontinuity_threshold: 0.04, texture: true } },
-      save: { class_type: 'SaveGLB', inputs: { mesh: ['mesh', 0], filename_prefix: `creatoros/scene_${source.replace(/\.[^.]+$/, '')}` } },
-    }
+    const g = grapheScene(src, W, H, `creatoros/scene_${source.replace(/\.[^.]+$/, '')}`)
     const promptId = await comfy.submitPrompt(g, CLIENT_ID)
     const h = await comfy.waitForPrompt(promptId, { timeoutMs: 10 * 60_000 })
     const f = Object.values(h?.outputs ?? {}).flatMap(o => o['3d'] ?? []).find(x => x.filename?.endsWith('.glb'))
@@ -1396,7 +1401,7 @@ export function sceneReshoot(source) {
   return p
 }
 
-function grapheReshoot(job, W, H, sonSource) {
+export function grapheReshoot(job, W, H, sonSource) {
   const N = job.reshootImages, w2 = W / 2, h2 = H / 2, cam = job.reshootCamera
   const cles = cam.cles?.map(k => ({ f: k.f < 0 ? N : k.f, az: k.az, el: k.el, dist: 1.0 }))
   const S1 = '1.000000, 0.997500, 0.995000, 0.992500, 0.990000, 0.987500, 0.985000, 0.982500, 0.980000, 0.977500, 0.975000, 0.948750, 0.922500, 0.872500, 0.798750, 0.725000, 0.603750, 0.482500, 0.337500, 0.168750, 0.000000'

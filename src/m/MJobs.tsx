@@ -13,6 +13,7 @@ import { useAppStore } from '../store/useAppStore'
 import { useTelemetry } from '../components/shell/useTelemetry'
 import { Ic, Opt, Sheet, fmtDur, useConfirm } from './bits'
 import { getLang, t, tp, tServeur } from '../i18n'
+import { CleProprietaire } from '../features/config/CleProprietaire'
 
 /** Message d'erreur du job : le serveur le renvoie, le type Job ne le
  *  déclare pas — on le lit sans mentir sur le typage. */
@@ -90,6 +91,8 @@ export function MJobs({ goLibrary }: { goLibrary: () => void }) {
         </>}
 
         {jobs.length === 0 && <div className="empty">{t('Aucun rendu pour l’instant.')}</div>}
+        {/* propriétaire : sa clé et les visiteurs du jour (rien ne s'affiche hors studio verrouillé) */}
+        <div style={{ overflowX: 'auto' }}><CleProprietaire /></div>
       </div>
 
       {detail && <JobSheet j={detail} onClose={() => setDetail(null)} onResults={goLibrary} />}

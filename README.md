@@ -4,6 +4,12 @@ A self-hosted creative studio for one recurring character, from a one-line brief
 
 ![Home: one brief, one reel](docs/screenshots/home.jpg)
 
+Built for the Comfy **#OpenSourceHiggsfield** challenge.
+
+- **Demo video (1:59)**: https://youtu.be/axHdAXHv3Kk
+- **Try it**: https://forge.taila06702.ts.net:8443 — the public demo runs on the author's own GPU, one render at a time, 5 renders per hour per visitor.
+- **Run it yourself**: see [Install](#install).
+
 CreatorOS Studio is the public, general-audience edition of a production tool used daily. It keeps the production recipes and the operator workflow. Private content and the original character are not included.
 
 ## What it does
@@ -36,7 +42,9 @@ Desktop UI (`src/v2`) and a mobile UI (`src/m`) are served by the same backend; 
 | ![Editor](docs/screenshots/editor.jpg) | ![Talking avatar](docs/screenshots/talking-avatar.jpg) |
 | **Editor**: timeline, trims, crossfades, text, music | **Talking avatar**: one photo, one voice |
 | ![Cinematic Studio](docs/screenshots/cinematic.jpg) | ![Re-shoot](docs/screenshots/reshoot.jpg) |
-| **Cinematic Studio**: a shot card instead of a prompt, same shot in four lights | **Re-shoot**: the same moment from a new camera angle |
+| **Cinematic Studio**: a shot card instead of a prompt, same shot in four lights | **Re-shoot**: the same moment from a new camera angle, previewed in 3D |
+| ![Mix](docs/screenshots/mix.jpg) | |
+| **Mix**: drop in a video, your character takes the person's place | |
 
 ![Mobile: library, camera & effects, one-click reel](docs/screenshots/mobile.jpg)
 
@@ -164,6 +172,10 @@ ComfyUI's `input/` folder may be shared with another install on the same machine
 ## Content policy
 
 This edition is general-audience only. Every job runs with a single SFW register, the rewriter instructions keep the character fully clothed, and a blocklist (`server/t0.js`) rejects prompts and captions with forbidden terms before anything reaches the GPU.
+
+## Characters in the demo
+
+The demo video and screenshots use fictional AI characters whose LoRAs are published on Civitai under licences that allow it: **Mila**, LoRA by [Solricks](https://civitai.com/models/2809908), and **Aisha**, LoRA by [KelevraQuakenstein](https://civitai.com/models/2327289) (credit required). **Ava** was created in the app for the video, with no LoRA. No real person's likeness is used.
 
 ## License
 

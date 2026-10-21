@@ -25,6 +25,23 @@ entrée de quel nœud reçoit `prompt`, `negative`, `seed`, `width`, `height`,
 | `PROD_v2v_refine.json` | non | refine V2V (agrandissement d'un brouillon) | nœuds **nommés** : `20` VHS_LoadVideo (`video`, `custom_width`, `custom_height`, `force_rate`), `12` KSampler (`denoise`, `seed`), `14` VAEDecode, `15` CreateVideo (`audio` optionnel), `SaveVideo` ; le serveur ajoute un nœud `RIFE VFI` |
 | `PROD_v2v_refine_masked.json` | non | pinceau vidéo | nœuds **nommés** : `20` VHS_LoadVideo, `12` KSampler, `8` CLIPTextEncode, `14` VAEDecode, `15` CreateVideo, `16` SaveVideo, `trk` SAM3_VideoTrack (`initial_mask`, `max_objects`), `m0` (masque issu du suivi), `mg` (agrandissement de masque : `mask`, `expand`) ; `cface`/`sam3` supprimés par le serveur |
 
+| `PROD_wananimate_mix.json` | oui | Mix (remplacement WanAnimate 2.2, WanVideoWrapper) | nœuds **nommés** : `63` VHS_LoadVideo (driver), `57` LoadImage (référence du personnage, rendue par le serveur si aucune still), `65` texte, `27` sampler (`seed`, `steps`), `62` WanVideoAnimateEmbeds (`frame_window_size`, `face_strength`), `73` DWPreprocessor, `107` PointsEditor (points SAM2 de `server/gdino_points.py`), `150`/`151` dimensions, `171` LoRA (identité Wan du personnage), `998` SaveVideo |
+
+### Graphes construits par le serveur
+
+Re-shoot, l'avatar parlant et la scène 3D ne lisent pas de recette : le serveur
+construit leur graphe dans `server/jobs.js` (`grapheReshoot`, `grapheParole`,
+`grapheScene`). Leur export de référence, au format API, est ici, avec des
+noms d'entrée d'exemple (`SOURCE.mp4`, `PHOTO.png`, `VOIX.wav`) ; on le
+régénère avec `node scripts/exporter-recettes.mjs`.
+
+| fichier | rôle |
+|---|---|
+| `REF_reshoot_angle.json` | Re-shoot, plan fixe : MoGe-2 → CrossViewWarp → LTX-2.5 22B + IC-LoRA CrossView-Warp v2, deux passes (demi-taille puis ×2) |
+| `REF_reshoot_mouvement.json` | Re-shoot, mouvement de caméra par images clés (az −35° → +35°) |
+| `REF_parole.json` | avatar parlant : InfiniteTalk sur Wan 2.1 I2V 480p + lightx2v |
+| `REF_scene3d.json` | scène 3D de la vue Re-shoot : MoGe-2, maillage texturé, GLB |
+
 Les fichiers `VB_*.json` sont des variantes de banc du motion control : le
 serveur ne les sert pas.
 
