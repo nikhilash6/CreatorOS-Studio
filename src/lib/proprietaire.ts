@@ -20,7 +20,7 @@ export function ecrireCleProprietaire(v: string | null) {
   void verifier()
 }
 
-/** Ajoute l'en-tête aux écritures de même origine vers /api/ — une seule fois, au démarrage. */
+/** Ajoute l'en-tête aux écritures de même origine vers /api/ (et aux lectures réservées) — une seule fois, au démarrage. */
 export function brancherCleProprietaire() {
   const origine = window.fetch.bind(window)
   window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
@@ -28,7 +28,10 @@ export function brancherCleProprietaire() {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
     const methode = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase()
     const memeOrigine = url.startsWith('/') || url.startsWith(window.location.origin)
-    if (cle && methode !== 'GET' && methode !== 'HEAD' && memeOrigine && new URL(url, window.location.origin).pathname.startsWith('/api/')) {
+    const chemin = memeOrigine ? new URL(url, window.location.origin).pathname : ''
+    // les écritures, plus les lectures réservées au propriétaire (visiteurs du jour)
+    const lectureReservee = chemin === '/api/visites'
+    if (cle && (lectureReservee || (methode !== 'GET' && methode !== 'HEAD')) && chemin.startsWith('/api/')) {
       const h = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined))
       h.set('X-Owner-Key', cle)
       return origine(input, { ...init, headers: h })
