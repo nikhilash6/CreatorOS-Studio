@@ -1,0 +1,115 @@
+/* ============================================================
+   Liste des personnages — choisir l'actif, en créer, dupliquer, supprimer.
+
+   Le personnage ACTIF est celui des prochains rendus ; l'éditeur placé
+   dessous modifie celui-là. Un rendu déjà en file garde le personnage qui
+   était actif quand il a été lancé.
+   Styles en ligne, couleurs héritées : partagé bureau et mobile.
+   ============================================================ */
+import { useEffect, useState } from 'react'
+import { useAppStore } from '../store/useAppStore'
+import { t, tServeur } from '../i18n'
+import { useEdition } from '../lib/proprietaire'
+import type { PersonaCredit } from '../types'
+import { CreditLigne } from './PersonaCredit'
+
+export interface PersonaResume {
+  id: string; name: string | null; trigger: string; avatar: string | null
+  loras: { name: string }[]; videoLoras: { name: string }[]; active: boolean
+  lorasKlein?: { name: string }[]; credit?: PersonaCredit | null
+}
+
+const bouton: React.CSSProperties = {
+  padding: '6px 11px', borderRadius: 8, font: 'inherit', fontSize: 12, cursor: 'pointer',
+  color: 'inherit', background: 'rgba(127,127,127,0.14)', border: '1px solid rgba(127,127,127,0.30)',
+}
+
+async function appel(url: string, init?: RequestInit) {
+  const r = await fetch(url, init)
+  const d = await r.json().catch(() => ({}))
+  if (!r.ok) throw new Error(tServeur((d as { error?: string }).error) ?? `HTTP ${r.status}`)
+  return d
+}
+
+/** `onChange` : appelé avec l'id de l'actif après chaque changement, pour que
+ *  l'éditeur se recharge sur le bon personnage. */
+export function PersonaListe({ onChange }: { onChange: (actif: string | null) => void }) {
+  const [liste, setListe] = useState<PersonaResume[] | null>(null)
+  const [nouveau, setNouveau] = useState<string | null>(null)
+  const [msg, setMsg] = useState<string | null>(null)
+  const refresh = useAppStore(s => s.refreshPersona)
+  const edition = useEdition()
+
+  const charger = async () => {
+    try {
+      const d = await appel('/api/personas') as { active: string | null; personas: PersonaResume[] }
+      setListe(d.personas); onChange(d.active)
+    } catch (e) { setMsg(t('lecture impossible : {e}', { e: (e as Error).message })) }
+  }
+  // relu aussi quand le nom ou la photo de l'actif change (éditeur, dépôt de photo)
+  const nomActif = useAppStore(s => s.personaName), photoActif = useAppStore(s => s.personaAvatar)
+  useEffect(() => { void charger() }, [nomActif, photoActif])   // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function agir(f: () => Promise<unknown>) {
+    setMsg(null)
+    try { await f(); await charger(); await refresh() }
+    catch (e) { setMsg((e as Error).message) }
+  }
+
+  const creer = (depuis?: string) => agir(() => appel('/api/personas', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: nouveau?.trim() || undefined, depuis }),
+  }).then(() => setNouveau(null)))
+
+  if (!liste) return <div style={{ fontSize: 13, opacity: 0.6 }}>{msg ?? t('chargement…')}</div>
+
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+        {liste.map(p => (
+          <div key={p.id} role="button" tabIndex={0} aria-pressed={p.active}
+            onClick={() => { if (!p.active) void agir(() => appel(`/api/personas/${p.id}/activer`, { method: 'POST' })) }}
+            onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && !p.active) void agir(() => appel(`/api/personas/${p.id}/activer`, { method: 'POST' })) }}
+            style={{
+              padding: 10, borderRadius: 12, cursor: p.active ? 'default' : 'pointer',
+              border: p.active ? '2px solid rgba(234,78,137,0.9)' : '1px solid rgba(127,127,127,0.30)',
+              background: p.active ? 'rgba(234,78,137,0.10)' : 'rgba(127,127,127,0.06)',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, textAlign: 'center', minWidth: 0,
+            }}>
+            {p.avatar
+              ? <img src={p.avatar} alt="" draggable={false} style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover' }} />
+              : <span style={{ width: 56, height: 56, borderRadius: '50%', background: 'linear-gradient(135deg,#3a4a5c,#232d38)' }} />}
+            <b style={{ fontSize: 13, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name || t('sans nom')}</b>
+            <span style={{ fontSize: 11, opacity: 0.6 }}>
+              {p.active ? t('actif · ') : ''}{[p.loras.length && 'Krea', p.lorasKlein?.length && 'Klein', p.videoLoras.length && t('vidéo')].filter(Boolean).join(' · ') || t('sans LoRA')}
+            </span>
+            <CreditLigne credit={p.credit} />
+            {edition && <div style={{ display: 'flex', gap: 6 }} onClick={e => e.stopPropagation()}>
+              <button style={{ ...bouton, padding: '3px 8px', fontSize: 11 }} title={t('Créer une copie de ce personnage')}
+                onClick={() => void creer(p.id)}>{t('dupliquer')}</button>
+              {liste.length > 1 && (
+                <button style={{ ...bouton, padding: '3px 8px', fontSize: 11 }} aria-label={t('supprimer {nom}', { nom: p.name ?? p.id })}
+                  onClick={() => { if (confirm(t('Supprimer « {nom} » ? Ses rendus restent dans la bibliothèque, ses LoRA dans le dossier.', { nom: p.name || p.id })))
+                    void agir(() => appel(`/api/personas/${p.id}`, { method: 'DELETE' })) }}>✕</button>
+              )}
+            </div>}
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        {!edition ? null : nouveau === null
+          ? <button style={bouton} onClick={() => setNouveau('')}>{t('+ Nouveau personnage')}</button>
+          : <>
+              <input autoFocus value={nouveau} placeholder={t('Nom')} maxLength={60}
+                onChange={e => setNouveau(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') void creer(); if (e.key === 'Escape') setNouveau(null) }}
+                style={{ padding: '6px 10px', borderRadius: 8, font: 'inherit', fontSize: 13, color: 'inherit',
+                  background: 'rgba(127,127,127,0.10)', border: '1px solid rgba(127,127,127,0.30)' }} />
+              <button style={bouton} onClick={() => void creer()}>{t('Créer')}</button>
+              <button style={bouton} onClick={() => setNouveau(null)}>{t('Annuler')}</button>
+            </>}
+        {msg && <span style={{ fontSize: 12, opacity: 0.8 }}>{msg}</span>}
+      </div>
+    </div>
+  )
+}

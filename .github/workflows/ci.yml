@@ -1,0 +1,37 @@
+# Vérifications à chaque push et pull request : types, build du front, syntaxe
+# du serveur et des recettes. Rien ne tourne contre ComfyUI ici (pas de GPU) :
+# les serveurs ne sont jamais importés, seulement vérifiés (`node --check`).
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verifier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Types et build du front
+        run: npm run build
+      - name: Syntaxe du serveur et des scripts
+        run: |
+          for f in server/*.js scripts/*.mjs scripts/installer/*.mjs; do
+            [ -f "$f" ] && node --check "$f"
+          done
+      - name: Recettes (JSON valide)
+        run: |
+          for f in workflows/*.json; do
+            node -e "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8'))" "$f" || { echo "JSON invalide : $f"; exit 1; }
+          done
+      - name: Lint
+        run: npx oxlint
+        continue-on-error: true

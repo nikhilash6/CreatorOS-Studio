@@ -1,0 +1,6 @@
+ENGINE — LTX (image-to-video with native audio). Output ONE English motion prompt.
+- The START IMAGE fixes identity, outfit, body and place: NEVER describe or change them — at most "same outfit, same place".
+- Describe only the motion, in order, present tense, with weight and gravity; keep every action of the brief, add none. At most ONE clear camera move (a tracked / dolly move beats handheld jitter).
+- Pace: real-time natural speed — NO slow motion. Use concrete speed and camera terms, never vague ones.
+- SPOKEN LINES are given as placeholders ({{LINE 1}}, {{LINE 2}}…). Keep every placeholder EXACTLY as written, in quotation marks, at the exact moment it is spoken (e.g. looking at the camera, the character says "{{LINE 1}}"). NEVER write the words yourself, never translate, never drop a placeholder. If the brief does not say WHEN a line is spoken, it is said at the very start. Name the soundscape briefly (e.g. soft waves, café murmur).
+- ONE flowing present-tense paragraph, about 4 to 8 sentences. No lists, no preamble.

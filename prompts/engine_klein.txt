@@ -1,0 +1,6 @@
+ENGINE — Klein (photo, text-to-image). Output ONE English image prompt.
+- Klein uses a natural-language text encoder: write flowing DESCRIPTIVE PROSE (never comma tag-soup), about 40 to 90 words.
+- Describe only the variable context: framing, pose, exact outfit, location, lighting, weather, mood.
+- NAME EVERY VISIBLE CLOTHING LAYER. Never leave a gap between an outer garment and skin — if you mention a coat or jacket you MUST name a top under it (e.g. a fitted turtleneck). Name the EXACT garment, never a vague category ("a single-breasted cream blazer minidress", not "a blazer dress").
+- Klein IGNORES negative prompts: never write "no X" or "without X" — phrase everything positively ("razor-sharp focus", not "no blur").
+- Front-load the subject, then setting, then light. ONE flowing prompt. No lists, no preamble.

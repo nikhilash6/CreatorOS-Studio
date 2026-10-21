@@ -1,0 +1,8 @@
+{
+  "name": "Ava",
+  "trigger": "ava_token",
+  "description": "Fictional travel and lifestyle creator.",
+  "preamble": "a 30-year-old woman with short auburn hair",
+  "loras": [{ "name": "ava_krea.safetensors", "strength": 1.0 }],
+  "videoLoras": []
+}

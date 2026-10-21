@@ -1,0 +1,115 @@
+/* ============================================================
+   Avatar parlant (21/10) — une photo + une voix (fichier ou micro) : le
+   personnage dit le texte, lèvres calées sur l'audio (InfiniteTalk, Wan 2.1).
+   Le rendu passe par la file ordinaire et arrive dans l'onglet Vidéo.
+   ============================================================ */
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { Asset } from '../types'
+import { useAppStore } from '../store/useAppStore'
+import { t, tServeur } from '../i18n'
+
+const json = async (r: Response) => { const b = await r.json().catch(() => ({})); if (!r.ok) throw new Error(tServeur(b.error) ?? `HTTP ${r.status}`); return b }
+
+export function ParoleView({ goVideo }: { goVideo: () => void }) {
+  const s = useAppStore()
+  const [photo, setPhoto] = useState<Asset | null>(null)
+  const [voix, setVoix] = useState<{ fichier: string; duree: number; url: string } | null>(null)
+  const [texte, setTexte] = useState('')
+  const [err, setErr] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [fait, setFait] = useState<string | null>(null)
+  const [enreg, setEnreg] = useState<{ rec: MediaRecorder; t0: number } | null>(null)
+  const [secondes, setSecondes] = useState(0)
+  const morceaux = useRef<Blob[]>([])
+
+  const photos = useMemo(() => s.assets.filter(a => a.mediaType === 'photo' && a.reviewStatus !== 'rejected')
+    .sort((x, y) => Number(y.reviewStatus === 'approved') - Number(x.reviewStatus === 'approved') || y.createdAt - x.createdAt).slice(0, 120), [s.assets])
+
+  useEffect(() => {
+    if (!enreg) return
+    const h = setInterval(() => {
+      const sec = (Date.now() - enreg.t0) / 1000
+      setSecondes(sec)
+      if (sec >= 20) enreg.rec.stop()          // même plafond que le serveur
+    }, 200)
+    return () => clearInterval(h)
+  }, [enreg])
+
+  const deposer = async (b: Blob, type: string) => {
+    setErr(null)
+    try {
+      const r = await json(await fetch('/api/parole/voix', { method: 'POST', headers: { 'Content-Type': type }, body: b }))
+      setVoix({ fichier: r.fichier, duree: r.duree, url: URL.createObjectURL(b) })
+    } catch (e) { setErr(String((e as Error).message)) }
+  }
+  const micro = async () => {
+    if (enreg) { enreg.rec.stop(); return }
+    setErr(null)
+    try {
+      const flux = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const rec = new MediaRecorder(flux)
+      morceaux.current = []
+      rec.ondataavailable = e => { if (e.data.size) morceaux.current.push(e.data) }
+      rec.onstop = () => {
+        flux.getTracks().forEach(tr => tr.stop())
+        setEnreg(null)
+        const type = (rec.mimeType || 'audio/webm').split(';')[0]
+        void deposer(new Blob(morceaux.current, { type }), type)
+      }
+      rec.start()
+      setSecondes(0)
+      setEnreg({ rec, t0: Date.now() })
+    } catch { setErr(t('micro indisponible : autorise-le dans le navigateur, ou dépose un fichier audio')) }
+  }
+  const lancer = async () => {
+    if (!photo || !voix) return
+    setBusy(true); setErr(null)
+    try {
+      const r = await json(await fetch('/api/parole', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assetId: photo.id, voix: voix.fichier, texte }) }))
+      void s.adoptServerJob(r.id)
+      setFait(t('{n} bloc(s) de rendu pour {d} s de voix', { n: r.blocs, d: r.duree.toFixed(1) }))
+    } catch (e) { setErr(String((e as Error).message)) }
+    setBusy(false)
+  }
+
+  return (
+    <div className="flex-1 min-h-0 overflow-y-auto vue-page" style={{ padding: '22px 28px' }}>
+      <div style={{ maxWidth: 980, margin: '0 auto', display: 'grid', gap: 16 }}>
+        <div>
+          <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>{t('Avatar parlant')}</h2>
+          <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4 }}>{t('Une photo, une voix : {nom} parle, les lèvres calées sur l’audio. Idéal pour une pub UGC face caméra.', { nom: s.personaName })}</div>
+        </div>
+        <div style={{ display: 'grid', gap: 8, padding: 16, borderRadius: 16, background: 'var(--lv1)' }}>
+          <b style={{ fontSize: 13 }}>{t('1. La photo')}</b>
+          <span style={{ fontSize: 11.5, color: 'var(--faint)' }}>{t('Visage bien visible, de face ou de trois quarts, plan poitrine ou plus serré.')}</span>
+          <div className="pkgrid" style={{ maxHeight: 260 }}>
+            {photos.map(a => (
+              <button key={a.id} className="pk" onClick={() => setPhoto(a)} style={{ outline: photo?.id === a.id ? '3px solid var(--accent)' : undefined }}>
+                <img src={a.uri} alt="" loading="lazy" />
+              </button>
+            ))}
+          </div>
+        </div>
+        <div style={{ display: 'grid', gap: 10, padding: 16, borderRadius: 16, background: 'var(--lv1)' }}>
+          <b style={{ fontSize: 13 }}>{t('2. La voix (20 s au plus)')}</b>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button className={`pill ${enreg ? 'used' : ''}`} onClick={() => void micro()}>{enreg ? `■ ${t('Arrêter')} · ${secondes.toFixed(1)} s` : `🎙 ${t('Enregistrer au micro')}`}</button>
+            <label className="pill tool" style={{ cursor: 'pointer' }}>⇪ {t('déposer un fichier audio')}
+              <input type="file" accept="audio/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) void deposer(f, f.type || 'audio/mpeg'); e.target.value = '' }} />
+            </label>
+            {voix && <audio src={voix.url} controls style={{ height: 32 }} />}
+            {voix && <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{voix.duree.toFixed(1)} s</span>}
+          </div>
+          <input value={texte} onChange={e => setTexte(e.target.value)} maxLength={400} placeholder={t('Optionnel : son attitude pendant qu’elle parle (en anglais, ex. « smiling, enthusiastic, holding a coffee cup »)')}
+            style={{ padding: '9px 11px', borderRadius: 10, background: 'var(--lv2)', border: '1px solid var(--lv3)', color: 'var(--text)', font: 'inherit', fontSize: 12.5 }} />
+        </div>
+        <div className="flex items-center gap-3">
+          <button className="cta" style={{ padding: '11px 20px', flexDirection: 'row' }} disabled={!photo || !voix || busy} onClick={() => void lancer()}>{busy ? '…' : `✨ ${t('Faire parler')}`}</button>
+          {fait && <span style={{ fontSize: 12.5 }}>✓ {t('En file de rendu')} — {fait}. <button className="pill tool" onClick={goVideo}>{t('Aller à Vidéo')}</button></span>}
+          {err && <span style={{ fontSize: 12, color: 'var(--danger)' }}>{err}</span>}
+        </div>
+      </div>
+    </div>
+  )
+}

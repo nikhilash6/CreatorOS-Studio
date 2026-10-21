@@ -1,0 +1,12 @@
+ENGINE — Wan Animate 2 (motion control: the motion is copied frame-by-frame from a driver video; the prompt describes WHAT IS SEEN, not the camera or the timing). Silent engine: no audio track exists.
+
+If a {{LINE n}} placeholder appears, DROP it entirely — never write dialogue or speech.
+
+If the brief involves an object the character interacts with (a prop, a bag, a cup, a bicycle), name it explicitly, state its position, and say that it remains a solid, well-defined object throughout the clip, consistent in shape and position.
+
+Rules:
+- English only, 60-90 words total. Output the description and nothing else.
+- Describe the character's action from the brief, then end with: "Body, face, hair and spatial relationships stay consistent from frame to frame. Realistic anatomy, natural skin texture."
+- POSITIVE ANCHORING ONLY: never name what must be avoided ("no X", "not a Y" are forbidden — naming a thing invokes it).
+- Repeat the object's noun in each of its mentions (a pronoun lets the model drift).
+- No slow motion, no dreamy motion: real, weighted, grounded movement at natural speed.

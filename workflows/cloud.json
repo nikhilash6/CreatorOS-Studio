@@ -1,0 +1,25 @@
+{
+  "_": "Différences entre les fichiers de modèles locaux et le catalogue Comfy Cloud. Appliquées au graphe seulement quand un job part vers Comfy Cloud (clé de visiteur).",
+  "renommer": {
+    "_krea2/krea2_turbo_fp8_scaled.safetensors": "krea2_turbo_fp8_scaled.safetensors",
+    "flux-2-klein-9b-fp8.safetensors": "flux-2-klein-9b.safetensors",
+    "Zoelexx_V2.safetensors": "FNNKVWTV0576D08SSR5XB6BSV0.safetensors"
+  },
+  "gguf": {
+    "Wan2.2-T2V-A14B-LowNoise-Q8_0.gguf": "wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors"
+  },
+  "_loras": "LoRA des personnages : nom de fichier local → source que Comfy Cloud télécharge lui-même à l'import (Paramètres → Comfy Cloud). Zoelexx porte sur Civitai un autre nom que le fichier local : même empreinte SHA-256, renommée ci-dessus.",
+  "loras": {
+    "zvyara_krea2_character_r16-step00000400.safetensors": "https://civitai.com/api/download/models/3185290",
+    "Zoelexx_V2.safetensors": "https://civitai.com/api/download/models/3168119",
+    "jessicaai_krea2_v1.safetensors": "https://civitai.com/api/download/models/3277983",
+    "Becky_V3_32_25_SB_2400-KREA2Raw.safetensors": "https://civitai.com/api/download/models/3364646",
+    "Becky_V2-KLEIN.safetensors": "https://civitai.com/api/download/models/3057329",
+    "Asian-Kimiko_Krea2_LOREVER.safetensors": "https://civitai.com/api/download/models/3108169",
+    "Asian-Kimiko_Flux2Klein9b_LOREVER.safetensors": "https://civitai.com/api/download/models/3003877",
+    "krea2_Breezy_AI_v4_epoch_9.safetensors": "https://civitai.com/api/download/models/3131376",
+    "flux2klein_br33zy_v1.safetensors": "https://civitai.com/api/download/models/2660687",
+    "mila_kr2.safetensors": "https://civitai.com/api/download/models/3211107",
+    "mila_ltx23_lora.safetensors": "https://civitai.com/api/download/models/3168700"
+  }
+}

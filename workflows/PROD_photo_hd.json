@@ -1,0 +1,241 @@
+{
+ "10": {
+  "class_type": "LoadImage",
+  "inputs": {
+   "image": "SRC.png"
+  },
+  "_meta": {
+   "title": "photo source"
+  }
+ },
+ "12": {
+  "class_type": "ImageScaleToTotalPixels",
+  "inputs": {
+   "image": [
+    "10",
+    0
+   ],
+   "upscale_method": "lanczos",
+   "megapixels": 2.0,
+   "resolution_steps": 16
+  },
+  "_meta": {
+   "title": "agrandissement DOUX — 4x-UltraSharp piquait les taches de rousseur en points noirs (22/09)"
+  }
+ },
+ "20": {
+  "class_type": "UNETLoader",
+  "inputs": {
+   "unet_name": "flux-2-klein-9b-fp8.safetensors",
+   "weight_dtype": "default"
+  }
+ },
+ "22": {
+  "class_type": "CLIPLoader",
+  "inputs": {
+   "clip_name": "qwen_3_8b_fp8mixed.safetensors",
+   "type": "flux2",
+   "device": "default"
+  }
+ },
+ "30": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "clip": [
+    "22",
+    0
+   ],
+   "text": ""
+  },
+  "_meta": {
+   "title": "prompt injecté par le serveur"
+  }
+ },
+ "31": {
+  "class_type": "FluxGuidance",
+  "inputs": {
+   "conditioning": [
+    "30",
+    0
+   ],
+   "guidance": 3
+  }
+ },
+ "32": {
+  "class_type": "ConditioningZeroOut",
+  "inputs": {
+   "conditioning": [
+    "30",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "négatif vide — un négatif réel ne pèse rien à cfg 1,3 (mesuré)"
+  }
+ },
+ "33": {
+  "class_type": "VAELoader",
+  "inputs": {
+   "vae_name": "flux2-vae.safetensors"
+  }
+ },
+ "34": {
+  "class_type": "VAEEncode",
+  "inputs": {
+   "pixels": [
+    "12",
+    0
+   ],
+   "vae": [
+    "33",
+    0
+   ]
+  }
+ },
+ "40": {
+  "class_type": "ClownsharKSampler_Beta",
+  "inputs": {
+   "model": [
+    "20",
+    0
+   ],
+   "positive": [
+    "31",
+    0
+   ],
+   "negative": [
+    "32",
+    0
+   ],
+   "latent_image": [
+    "34",
+    0
+   ],
+   "sampler_name": "multistep/res_2m",
+   "scheduler": "beta57",
+   "steps": 20,
+   "steps_to_run": -1,
+   "denoise": 0.2,
+   "cfg": 1.3,
+   "seed": 0,
+   "eta": 0.25,
+   "sampler_mode": "standard",
+   "bongmath": true
+  },
+  "_meta": {
+   "title": "affinage — denoise = force du renforcement (0,08 doux … 0,26 fort)"
+  }
+ },
+ "41": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "40",
+    0
+   ],
+   "vae": [
+    "33",
+    0
+   ]
+  }
+ },
+ "50": {
+  "class_type": "ColorMatch",
+  "inputs": {
+   "image_ref": [
+    "12",
+    0
+   ],
+   "image_target": [
+    "41",
+    0
+   ],
+   "method": "mkl",
+   "strength": 1
+  },
+  "_meta": {
+   "title": "recale l'exposition sur la source — l'affinage assombrit et réchauffe"
+  }
+ },
+ "60": {
+  "class_type": "UltralyticsDetectorProvider",
+  "inputs": {
+   "model_name": "bbox/face_yolov8m.pt"
+  }
+ },
+ "61": {
+  "class_type": "BboxDetectorCombined_v2",
+  "inputs": {
+   "bbox_detector": [
+    "60",
+    0
+   ],
+   "image": [
+    "12",
+    0
+   ],
+   "threshold": 0.5,
+   "dilation": 24
+  }
+ },
+ "62": {
+  "class_type": "GrowMask",
+  "inputs": {
+   "mask": [
+    "61",
+    0
+   ],
+   "expand": 16,
+   "tapered_corners": true
+  }
+ },
+ "63": {
+  "class_type": "FeatherMask",
+  "inputs": {
+   "mask": [
+    "62",
+    0
+   ],
+   "left": 64,
+   "top": 64,
+   "right": 64,
+   "bottom": 64
+  },
+  "_meta": {
+   "title": "fondu large : le raccord visage/corps ne doit pas se voir"
+  }
+ },
+ "70": {
+  "class_type": "ImageCompositeMasked",
+  "inputs": {
+   "destination": [
+    "50",
+    0
+   ],
+   "source": [
+    "12",
+    0
+   ],
+   "x": 0,
+   "y": 0,
+   "resize_source": false,
+   "mask": [
+    "63",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "le VISAGE reste celui de la source : l'affinage y noircit les taches de rousseur"
+  }
+ },
+ "90": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "images": [
+    "70",
+    0
+   ],
+   "filename_prefix": "creatoros/photo_hd"
+  }
+ }
+}

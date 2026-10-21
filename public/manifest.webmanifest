@@ -1,0 +1,16 @@
+{
+  "name": "CreatorOS Studio",
+  "short_name": "CreatorOS",
+  "description": "Studio de production — bibliothèque, création et suivi des rendus.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#101114",
+  "theme_color": "#101114",
+  "icons": [
+    { "src": "/favicon-sil.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/favicon-sil.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/favicon-sil.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
