@@ -3,6 +3,8 @@ export const commun: Record<string, string> = {
   'Langue de l’interface': 'Interface language',
   'Comfy Cloud — générer avec ta clé': 'Comfy Cloud — generate with your key',
   'Avec une clé Comfy Cloud, tes rendus tournent sur ton compte Comfy (tes crédits), pas sur la carte graphique de ce serveur. La clé reste dans ce navigateur ; elle accompagne chaque rendu jusqu’au serveur, qui ne l’enregistre ni ne la journalise.': 'With a Comfy Cloud key, your renders run on your own Comfy account (your credits), not on this server’s GPU. The key stays in this browser; it travels with each render request to the server, which never stores or logs it.',
+  'expérimental': 'experimental',
+  'Pas encore vérifié de bout en bout : Comfy Cloud ne délivre de clé API qu’aux comptes payants. Sans clé, tes rendus passent sur la carte graphique de ce serveur, comme d’habitude.': 'Not yet verified end to end: Comfy Cloud only issues API keys to paid accounts. Without a key, your renders run on this server’s GPU as usual.',
   'Clé enregistrée dans ce navigateur': 'Key saved in this browser',
   'Oublier la clé': 'Forget the key',
   'Utiliser cette clé': 'Use this key',

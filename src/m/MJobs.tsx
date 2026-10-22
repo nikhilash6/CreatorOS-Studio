@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Job } from '../types'
 import { vignetteOf } from '../components/AssetMedia'
 import { STATUTS_ACTIFS, STATUTS_EN_CALCUL } from '../types'
+import { attente } from '../lib/attente'
 import { useAppStore } from '../store/useAppStore'
 import { useTelemetry } from '../components/shell/useTelemetry'
 import { Ic, Opt, Sheet, fmtDur, useConfirm } from './bits'
@@ -194,7 +195,7 @@ function JobCard({ j, rank, onDetail, onResults }: {
           </b>
           <small className="muted" style={{ display: 'block', marginTop: 2 }}>
             {label}
-            {rank != null ? (rank === 0 ? t(' · 1er dans la file') : t(' · {n}e dans la file', { n: rank + 1 })) : ''}
+            {attente(j) ? ` · ${attente(j)}` : rank != null ? (rank === 0 ? t(' · 1er dans la file') : t(' · {n}e dans la file', { n: rank + 1 })) : ''}
           </small>
         </div>
       </div>

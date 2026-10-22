@@ -130,6 +130,8 @@ export const bureau_grilles: Record<string, string> = {
   'finition': 'finishing',
   'rendu': 'rendering',
   'en file': 'queued',
+  'Ta vidéo dure {s} s : le Mix n’en garde que les 9,6 premières secondes.': 'Your video is {s} s long: Mix only keeps the first 9.6 seconds.',
+  'Mix : 9,6 s de vidéo au plus, au-delà la fin est coupée.': 'Mix: 9.6 s of video at most; anything longer is trimmed.',
   'Rendu en échec.': 'Render failed.',
   'échec': 'failed',
   'cliquer pour tout lire': 'click to read it all',

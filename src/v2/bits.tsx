@@ -7,6 +7,7 @@ import { Children, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Asset, Job } from '../types'
 import { STATUTS_EN_CALCUL } from '../types'
+import { attente } from '../lib/attente'
 import { useAppStore } from '../store/useAppStore'
 import { posterOf, vignetteOf } from '../components/AssetMedia'
 import { renderTime } from '../lib/renderTime'
@@ -568,7 +569,7 @@ export function JobCard({ j, queueIds }: { j: Job; queueIds?: string[] }) {
           style={{ position: 'absolute', top: 8, right: 8 }}
           onClick={e => { e.stopPropagation(); void cancel(j.id) }}><Ic n="x" /></button>
         {lent && <div className="jlent" title={t('Bien plus long que les derniers rendus de cette recette. Cause fréquente : mémoire vidéo saturée (un autre programme sur la carte, ou un modèle resté chargé).')}>{t('anormalement lent — mémoire vidéo saturée ?')}</div>}
-        <div className="eta">{finition ? `${t('finition')} · ${eta}` : active ? `${t(j.phase ?? 'rendu')} · ${eta}` : `${t('en file')} · ${eta}`}</div>
+        <div className="eta">{finition ? `${t('finition')} · ${eta}` : active ? `${t(j.phase ?? 'rendu')} · ${eta}` : attente(j) ?? `${t('en file')} · ${eta}`}</div>
         <div className="pbar"><i style={{ width: `${finition ? 97 : active ? Math.max(pct, 4) : 0}%` }} /></div>
       </div>
     </div>

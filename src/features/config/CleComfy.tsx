@@ -8,7 +8,11 @@ export function CleComfy() {
   const [saisie, setSaisie] = useState('')
   return (
     <div className="border border-border rounded-card bg-surface2 p-4 max-w-[720px]">
-      <div className="font-semibold text-[13px] mb-1">{t('Comfy Cloud — générer avec ta clé')}</div>
+      <div className="font-semibold text-[13px] mb-1">{t('Comfy Cloud — générer avec ta clé')}
+        {' '}<span className="text-[10.5px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded" style={{ background: 'rgba(240,180,60,.16)', color: '#f0b43c' }}>{t('expérimental')}</span></div>
+      <p className="text-[12px] mb-2" style={{ lineHeight: 1.5, color: '#f0b43c' }}>
+        {t('Pas encore vérifié de bout en bout : Comfy Cloud ne délivre de clé API qu’aux comptes payants. Sans clé, tes rendus passent sur la carte graphique de ce serveur, comme d’habitude.')}
+      </p>
       <p className="text-[12px] text-muted mb-3" style={{ lineHeight: 1.5 }}>
         {t('Avec une clé Comfy Cloud, tes rendus tournent sur ton compte Comfy (tes crédits), pas sur la carte graphique de ce serveur. La clé reste dans ce navigateur ; elle accompagne chaque rendu jusqu’au serveur, qui ne l’enregistre ni ne la journalise.')}
       </p>

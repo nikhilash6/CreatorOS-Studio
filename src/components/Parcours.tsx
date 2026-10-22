@@ -63,7 +63,7 @@ export function Parcours({ onClose, aller }: { onClose: () => void; aller: (s: '
     { titre: t('3 · Finir et comparer'), corps: (<>
       <p>{t('Sur une vidéo : ♪ ajouter le son à un clip muet, ≈ fluidité 48 i/s. Sur n’importe quel rendu : 🎲 « Encore une » relance les mêmes réglages avec une nouvelle graine.')}</p>
       <p>{t('Coche 2 à 4 rendus puis « Comparer » pour les voir côte à côte, vidéos lues ensemble.')}</p>
-      <p style={{ opacity: 0.7, fontSize: 12.5 }}>{t('Pour rendre avec ton propre compte : Paramètres → Comfy Cloud.')}</p>
+      <p style={{ opacity: 0.7, fontSize: 12.5 }}>{t('Pour rendre avec ton propre compte (expérimental) : Paramètres → Comfy Cloud.')}</p>
     </>) },
   ]
   const e = ETAPES[etape]

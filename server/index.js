@@ -25,7 +25,7 @@ import { T0_BLOCKLIST, t0Hit } from './t0.js'
 import { persona, personas, identityPreambleFor, enregistrer as enregistrerPersona, champsFiges, creer as creerPersona, activer as activerPersona, supprimer as supprimerPersona } from './persona.js'
 import { lireCreateur, ecrireCreateur } from './createur.js'
 import { etatCloud, importerCloud, tacheCloud } from './cloud-loras.js'
-import { enqueueParole, enqueueReshoot, sceneReshoot, deposerAvecCle, enqueue, enqueueParPlans, enqueueInpaint, enqueueInpaintVideo, enqueueUpscale, enqueueFinition, enqueuePhotoHd, cancelJob, promoteJob, reorderQueue, RENDER_RATES, driverMeta, recoverQueue, queueDepth, RECIPES, VIDEO_ENGINES, recettesServies, DEFAULT_VIDEO_ENGINE, MOTION_RECIPES, DEPRECATED_RECIPES } from './jobs.js'
+import { enqueueParole, enqueueReshoot, sceneReshoot, deposerAvecCle, enqueue, enqueueParPlans, enqueueInpaint, enqueueInpaintVideo, enqueueUpscale, enqueueFinition, enqueuePhotoHd, cancelJob, promoteJob, reorderQueue, RENDER_RATES, driverMeta, recoverQueue, queueDepth, placeDansFile, RECIPES, VIDEO_ENGINES, recettesServies, DEFAULT_VIDEO_ENGINE, MOTION_RECIPES, DEPRECATED_RECIPES } from './jobs.js'
 import { diagnostiquer, figerNoeuds, resumeDiagnostic } from './diagnostic.js'
 import * as montage from './montage.js'
 import * as reel from './reel.js'
@@ -57,7 +57,7 @@ app.addHook('onRequest', async (req, reply) => {
 })
 app.post('/api/proprietaire', async req => ({ verrou: !!CONFIG.cleProprietaire, proprietaire: estProprietaire(req) }))
 // visiteurs par jour, limite de rendus des visiteurs Internet (cf. visites.js)
-installerVisites(app, { dataDir: CONFIG.dataDir, estProprietaire, profondeurFile: () => queueDepth() })
+installerVisites(app, { dataDir: CONFIG.dataDir, estProprietaire, avecCle: () => !!CONFIG.cleProprietaire, profondeurFile: () => queueDepth(), lireJob: id => store.getJob(id) })
 
 /* Aucune réponse JSON ne montre le dossier personnel du serveur (chemins des
    recettes, de la base, messages d'erreur de ffmpeg ou de ComfyUI) : il est
@@ -886,6 +886,8 @@ app.get('/api/jobs/:id', async (req, reply) => {
   const job = store.getJob(req.params.id)
   if (!job) { reply.code(404); return { error: 'job inconnu' } }
   const out = jobOut(job)
+  // Rang et attente estimée d'un job en attente (affichés sur sa carte)
+  if (job.status === 'queued') out.file = placeDansFile(job.id) ?? undefined
   // Progression du rendu en cours — celle que l'interface de ComfyUI affiche.
   // Approximative par construction (par nœud), et présentée comme telle.
   if (job.status === 'rendering' && job.comfy_prompt_id) {

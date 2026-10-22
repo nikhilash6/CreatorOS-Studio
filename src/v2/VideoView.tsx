@@ -13,7 +13,7 @@ import { useAppStore } from '../store/useAppStore'
 import { engineInfo, moteurT2v, VIDEO_ENGINES } from '../features/console/video/engines'
 import { Ic, rollingEta, fmtDur, SortBar, AssetCard, JobCard, FailCard, failedJobs, SeedPill, JustifiedGrid, ratioOf, MobileSheet, SelectionBar, applyFilters, useConfirm, V2Portal, useExclusiveMenu, type ReviewFilter, type DraftFilter } from './bits'
 import { EnhancerPopup, FramePicker, TriagePopup } from './popups'
-import { t, tp } from '../i18n'
+import { getLang, t, tp } from '../i18n'
 
 /* Durées proposées, filtrées au rendu par le plafond du moteur choisi
    (`engineInfo().maxSeconds`, fourni par le serveur). Une liste figée
@@ -262,7 +262,7 @@ export function VideoView({ onOpen }: { onOpen: (a: Asset, list: Asset[]) => voi
           </div>
           <div className="flex gap-2">
             <label className={`slot ${v.motionDriverFile ? 'filled' : ''}`}>
-              <span className="opt">3-30 s</span>
+              <span className="opt">{v.motionMode === 'replace' ? (getLang() === 'fr' ? '3-9,6 s' : '3-9.6 s') : '3-30 s'}</span>
               {v.motionRefUri ? <video src={v.motionRefUri} muted /> : <>▶＋<br />{t('Vidéo driver')}</>}
               {v.motionDriverFile && <em>{v.motionDriverFile.slice(0, 22)}</em>}
               <input type="file" accept="video/*" className="hidden"
@@ -274,6 +274,14 @@ export function VideoView({ onOpen }: { onOpen: (a: Asset, list: Asset[]) => voi
               </button>
             )}
           </div>
+          {/* Mix borné à 153 images (server/jobs.js, MIX_MAX_IMAGES) : dit AVANT le lancement */}
+          {v.motionMode === 'replace' && (
+            <div className="text-[10.5px]" style={{ color: v.motionDriverSeconds > 9.6 ? 'var(--warn, #ffb648)' : 'var(--muted)', lineHeight: 1.5 }}>
+              {v.motionDriverSeconds > 9.6
+                ? t('Ta vidéo dure {s} s : le Mix n’en garde que les 9,6 premières secondes.', { s: v.motionDriverSeconds.toFixed(1).replace('.', getLang() === 'fr' ? ',' : '.') })
+                : t('Mix : 9,6 s de vidéo au plus, au-delà la fin est coupée.')}
+            </div>
+          )}
           {(v.motionDriverError || v.motionStillError) && (
             <div className="text-[10.5px]" style={{ color: 'var(--danger)' }}>{v.motionDriverError || v.motionStillError}</div>
           )}

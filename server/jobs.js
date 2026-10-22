@@ -1971,6 +1971,7 @@ async function pump() {
   const job = queue.shift()
   if (!job) return
   running = true
+  enCours = { estimatedMs: job.estimatedMs, debut: Date.now() }
   /* La carte est prise pour ComfyUI le temps du job (cf. server/gpu.js). */
   /* Clé de visiteur → Comfy Cloud par le SDK ; transport SDK global → proxy
      local ; sinon ComfyUI local, la carte arbitrée avec Ollama (gpu.js). */
@@ -1982,6 +1983,7 @@ async function pump() {
   finally { clesComfy.delete(job.id) }
   if (job.motionPlan) await assemblerPlans(job).catch(e => console.warn(`[plans] montage non produit — ${String(e.message || e).slice(0, 300)}`))
   running = false
+  enCours = null
   pump()
 }
 
@@ -2574,3 +2576,16 @@ async function harvestJob(job, promptId, history, extras = {}) {
 }
 
 export const queueDepth = () => queue.length + (running ? 1 : 0)
+
+/* Place d'un job en attente, pour l'afficher au visiteur (22/10) : son rang
+   (1 = le prochain), et l'attente avant son départ estimée par les durées
+   prévues du job en cours (ce qu'il lui reste) et de ceux qui le précèdent. */
+let enCours = null   // { estimatedMs, debut }
+const DUREE_PAR_DEFAUT = 60_000
+export function placeDansFile(id) {
+  const i = queue.findIndex(j => j.id === id)
+  if (i < 0) return null
+  let attenteMs = enCours ? Math.max(15_000, (enCours.estimatedMs ?? DUREE_PAR_DEFAUT) - (Date.now() - enCours.debut)) : 0
+  for (const j of queue.slice(0, i)) attenteMs += j.estimatedMs ?? DUREE_PAR_DEFAUT
+  return { rang: i + 1, attenteMs: Math.round(attenteMs) }
+}

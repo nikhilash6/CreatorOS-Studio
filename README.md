@@ -1,6 +1,6 @@
 # CreatorOS Studio
 
-A self-hosted creative studio for one recurring character, from a one-line brief to a finished reel: photos, carousels, image-to-video, one-click camera moves and effects, talking avatars, motion transfer, brush retouching and a built-in video editor. It runs on top of a local [ComfyUI](https://github.com/comfyanonymous/ComfyUI), on your own GPU, using open-weights models only. It also runs on Comfy Cloud with your own key.
+A self-hosted creative studio for one recurring character, from a one-line brief to a finished reel: photos, carousels, image-to-video, one-click camera moves and effects, talking avatars, motion transfer, brush retouching and a built-in video editor. It runs on top of a local [ComfyUI](https://github.com/comfyanonymous/ComfyUI), on your own GPU, using open-weights models only. Running on Comfy Cloud with your own key is experimental: the path is wired but not yet verified end to end (Comfy only issues API keys to paid accounts).
 
 ![Home: one brief, one reel](docs/screenshots/home.jpg)
 
@@ -143,6 +143,7 @@ All settings are environment variables. The main ones:
 | `CREATOROS_LLM` / `CREATOROS_VLM_DESCRIBE` | `mistral-small:latest` / `qwen2.5vl:7b` | |
 | `CREATOROS_PHOTO_ENGINE` | `krea` | `krea` or `klein` |
 | `CREATOROS_OWNER_KEY` | unset | locks the studio for a public demo, see below |
+| `CREATOROS_NOTIF_URL` | unset | [ntfy](https://ntfy.sh) topic URL: the owner is notified when an Internet visitor starts a render, and when one fails or is refused |
 
 ### Your character
 
@@ -166,6 +167,8 @@ Only use a character you own: a fictional one you created, or yourself.
 ### Public demo
 
 Set `CREATOROS_OWNER_KEY` to a long random string before opening the studio to visitors. With a key, the Creator page, the characters and their wardrobe, LoRA uploads, profile photos, recipes and shaping texts are read-only: those writes answer 403 unless the request carries the exact key in an `X-Owner-Key` header. The owner enters the key once in Settings → Comfy Cloud; it stays in that browser. Visitors keep rendering, reviewing, editing and exporting. Without a key nothing is locked, which suits a single-user install.
+
+Internet visitors (anyone without the key and outside the tailnet) are limited to 5 renders per hour each, and are turned away while the public queue holds 8 jobs. A queued job shows its rank and an estimated start time. Settings → Comfy Cloud gives the owner a daily count of visitors, page views and renders, which keeps nothing personal: a visitor is a salted hash that changes every day. It also lists the latest visitor renders with their outcome and failure cause.
 
 ComfyUI's `input/` folder may be shared with another install on the same machine. The studio keeps a register of the files it put there itself: the source picker only lists those, and a job or an image description that names any other file is refused. No JSON response shows the server's home folder; it is replaced by `~`.
 

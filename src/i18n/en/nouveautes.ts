@@ -74,7 +74,7 @@ export const nouveautes: Record<string, string> = {
   '3 · Finir et comparer': '3 · Finish and compare',
   'Sur une vidéo : ♪ ajouter le son à un clip muet, ≈ fluidité 48 i/s. Sur n’importe quel rendu : 🎲 « Encore une » relance les mêmes réglages avec une nouvelle graine.': 'On a video: ♪ add sound to a silent clip, ≈ smooth 48 fps. On any render: 🎲 “One more” reruns the same settings with a new seed.',
   'Coche 2 à 4 rendus puis « Comparer » pour les voir côte à côte, vidéos lues ensemble.': 'Tick 2 to 4 renders then “Compare” to see them side by side, videos playing together.',
-  'Pour rendre avec ton propre compte : Paramètres → Comfy Cloud.': 'To render with your own account: Settings → Comfy Cloud.',
+  'Pour rendre avec ton propre compte (expérimental) : Paramètres → Comfy Cloud.': 'To render with your own account (experimental): Settings → Comfy Cloud.',
   '‹ Retour': '‹ Back',
   'Voir les personnages': 'See the characters',
   'Suivant ›': 'Next ›',

@@ -63,6 +63,7 @@ interface ApiJob {
   progress?: { value: number; max: number; etaS: number | null }
   phase?: string
   apercu?: number
+  file?: { rang: number; attenteMs: number }
   durationMs: number | null
   error: string | null
   seed: number | null
@@ -176,6 +177,7 @@ class ApiWorker implements GenerationWorker {
     let last = ''
     let lastPhase: string | undefined
     let lastApercu: number | undefined
+    let lastRang: number | undefined
     let pannes = 0
     /* Le suivi ne doit JAMAIS mourir en silence (10/10) : une exception hors de
        l'appel réseau (réponse inattendue, erreur à l'émission) arrêtait la
@@ -220,11 +222,12 @@ class ApiWorker implements GenerationWorker {
       /* La progression change à chaque pas d'échantillonnage : on émet aussi
          quand elle bouge, sinon la barre resterait figée sur « rendering ». */
       const prog = r.job.progress
-      if (status !== last || prog || r.job.phase !== lastPhase || r.job.apercu !== lastApercu) {
+      if (status !== last || prog || r.job.phase !== lastPhase || r.job.apercu !== lastApercu || r.job.file?.rang !== lastRang) {
         last = status
         lastPhase = r.job.phase
         lastApercu = r.job.apercu
-        this.emit(withSeed({ ...job, status, progress: prog, phase: r.job.phase, apercu: r.job.apercu }))
+        lastRang = r.job.file?.rang
+        this.emit(withSeed({ ...job, status, progress: prog, phase: r.job.phase, apercu: r.job.apercu, file: r.job.file }))
       }
       return false
     }

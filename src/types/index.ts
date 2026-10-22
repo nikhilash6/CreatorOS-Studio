@@ -447,6 +447,8 @@ export interface Job {
   phase?: string
   /** Horodatage du dernier aperçu en direct poussé par ComfyUI (absent : pas d'aperçu). */
   apercu?: number
+  /** En attente : rang dans la file (1 = le prochain) et attente estimée avant le départ. */
+  file?: { rang: number; attenteMs: number }
   /** Cause de l'échec, déjà traduite par le serveur (server/erreurs.js). */
   error?: string | null
   /** Présente uniquement pendant le rendu ; approximative (par nœud). */
