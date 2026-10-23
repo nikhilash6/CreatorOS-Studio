@@ -172,6 +172,23 @@ export function WorkbenchView() {
     catch (e) { setJsonError((e as Error).message) }
   }
 
+  /* Import d'un fichier : remplit l'éditeur, n'écrit rien. L'opérateur relit,
+     puis « Enregistrer » passe par la validation et la sauvegarde du serveur. */
+  const importer = async (f: File) => {
+    const brut = await f.text()
+    let wf: unknown
+    try { wf = JSON.parse(brut) }
+    catch (e) { setBanner({ tone: 'err', msg: t('JSON invalide : {e}', { e: (e as Error).message }) }); return }
+    // L'export « Save » de l'interface (nodes + links) n'est pas jouable par le serveur.
+    if (wf && typeof wf === 'object' && Array.isArray((wf as { nodes?: unknown }).nodes)) {
+      setBanner({ tone: 'err', msg: t('« {f} » est un export de l’interface ComfyUI (nodes + links). Exporter le graphe avec « Save (API) » ou « Export (API) », puis l’importer.', { f: f.name }) })
+      return
+    }
+    const v = JSON.stringify(wf, null, 1) + '\n'
+    setText(v); setJsonError(null)
+    setBanner({ tone: 'warn', msg: t('« {f} » chargé dans l’éditeur, rien n’est encore écrit. Relire, puis « Enregistrer » : la recette actuelle est sauvegardée dans .backups/ avant d’être remplacée.', { f: f.name }) })
+  }
+
   const save = async () => {
     if (!sel) return
     setSaving(true); setBanner(null)
@@ -336,6 +353,14 @@ export function WorkbenchView() {
                 {saving ? t('… écriture') : t('💾 Enregistrer sur le disque')}
               </Button>
               <Button disabled={saving} onClick={() => void open(sel.kind, sel.file)}>{t('↺ Relire le disque')}</Button>
+              {sel.kind === 'recette' && (
+                <label className={cn('rounded-ctl font-semibold cursor-pointer transition-colors bg-surface2 border border-border2 text-text hover:bg-surface3 px-4 py-2 text-[12.5px]', saving && 'opacity-50 pointer-events-none')}
+                  title={t('Remplacer le contenu par un workflow exporté de ComfyUI au format API (.json)')}>
+                  {t('📂 Importer un workflow API')}
+                  <input type="file" accept=".json,application/json" className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) void importer(f); e.target.value = '' }} />
+                </label>
+              )}
               <Button className="ml-auto"
                 onClick={() => void navigator.clipboard?.writeText(text)}>{t('⧉ Copier')}</Button>
             </div>
