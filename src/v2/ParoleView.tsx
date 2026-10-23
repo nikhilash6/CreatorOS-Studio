@@ -7,10 +7,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Asset } from '../types'
 import { useAppStore } from '../store/useAppStore'
 import { t, tServeur } from '../i18n'
+import { useEdition } from '../lib/proprietaire'
 
 const json = async (r: Response) => { const b = await r.json().catch(() => ({})); if (!r.ok) throw new Error(tServeur(b.error) ?? `HTTP ${r.status}`); return b }
 
 export function ParoleView({ goVideo }: { goVideo: () => void }) {
+  const edition = useEdition()
   const s = useAppStore()
   const [photo, setPhoto] = useState<Asset | null>(null)
   const [voix, setVoix] = useState<{ fichier: string; duree: number; url: string } | null>(null)
@@ -94,10 +96,11 @@ export function ParoleView({ goVideo }: { goVideo: () => void }) {
         <div style={{ display: 'grid', gap: 10, padding: 16, borderRadius: 16, background: 'var(--lv1)' }}>
           <b style={{ fontSize: 13 }}>{t('2. La voix (20 s au plus)')}</b>
           <div className="flex items-center gap-2 flex-wrap">
-            <button className={`pill ${enreg ? 'used' : ''}`} onClick={() => void micro()}>{enreg ? `■ ${t('Arrêter')} · ${secondes.toFixed(1)} s` : `🎙 ${t('Enregistrer au micro')}`}</button>
+            {!edition && <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{t('Sur la démo publique, la voix ne peut pas être envoyée : l’avatar parlant est réservé au propriétaire.')}</span>}
+            {edition && <><button className={`pill ${enreg ? 'used' : ''}`} onClick={() => void micro()}>{enreg ? `■ ${t('Arrêter')} · ${secondes.toFixed(1)} s` : `🎙 ${t('Enregistrer au micro')}`}</button>
             <label className="pill tool" style={{ cursor: 'pointer' }}>⇪ {t('déposer un fichier audio')}
               <input type="file" accept="audio/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) void deposer(f, f.type || 'audio/mpeg'); e.target.value = '' }} />
-            </label>
+            </label></>}
             {voix && <audio src={voix.url} controls style={{ height: 32 }} />}
             {voix && <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{voix.duree.toFixed(1)} s</span>}
           </div>

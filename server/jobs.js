@@ -447,21 +447,25 @@ export function reorderQueue(ids) {
   return { order: queue.map(j => j.id) }
 }
 
+/* Jobs annulés pendant leur exécution : l'interruption remonte en erreur de
+   ComfyUI, qu'il ne faut pas confondre avec un vrai échec (journal, alerte). */
+const annulesEnCours = new Set()
+
 export async function cancelJob(id) {
   const i = queue.findIndex(j => j.id === id)
   if (i >= 0) {
     queue.splice(i, 1)
-    store.markFailed(id, 0, 'annulé par l’opérateur (jamais lancé)')
+    store.markFailed(id, 0, 'annulé par l’utilisateur (jamais lancé)')
     return { id, cancelled: 'queued' }
   }
   if (current?.jobId === id) {
     // Deux gestes : retirer le prompt s'il attend encore côté ComfyUI, et
     // interrompre s'il est déjà en exécution. Les deux sont sans effet quand
     // ils ne s'appliquent pas — on envoie donc les deux.
+    annulesEnCours.add(id)
     await comfy.deleteQueued(current.promptId).catch(() => {})
     await comfy.interrupt(current.promptId).catch(() => {})
-    // runJob verra l'exécution interrompue et marquera le job en échec ;
-    // on précise la cause tout de suite pour que le front l'affiche.
+    // runJob verra l'exécution interrompue et la notera comme une annulation.
     return { id, cancelled: 'running' }
   }
   return null
@@ -2396,6 +2400,11 @@ async function runJob(job, isRetry = false, connRetried = false) {
        ce n'est pas le job qui est en cause. On attend qu'il réponde et on
        rejoue UNE fois — sans quoi toute la file se vide en « blocked » le
        temps d'un redémarrage de ComfyUI. */
+    if (annulesEnCours.delete(job.id)) {
+      store.markFailed(job.id, Date.now() - t0, 'annulé par l’utilisateur pendant le rendu')
+      console.log(`[job ${job.id}] annulé pendant le rendu`)
+      return
+    }
     const isConn = /fetch failed|ECONNREFUSED|ECONNRESET|socket hang up/i.test(String(e.message || e))
     if (isConn && !connRetried) {
       console.warn(`[job ${job.id}] ComfyUI injoignable — attente puis relance`)

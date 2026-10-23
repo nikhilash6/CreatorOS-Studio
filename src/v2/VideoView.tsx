@@ -14,6 +14,7 @@ import { engineInfo, moteurT2v, VIDEO_ENGINES } from '../features/console/video/
 import { Ic, rollingEta, fmtDur, SortBar, AssetCard, JobCard, FailCard, failedJobs, SeedPill, JustifiedGrid, ratioOf, MobileSheet, SelectionBar, applyFilters, useConfirm, V2Portal, useExclusiveMenu, type ReviewFilter, type DraftFilter } from './bits'
 import { EnhancerPopup, FramePicker, TriagePopup } from './popups'
 import { getLang, t, tp } from '../i18n'
+import { useEdition } from '../lib/proprietaire'
 
 /* Durées proposées, filtrées au rendu par le plafond du moteur choisi
    (`engineInfo().maxSeconds`, fourni par le serveur). Une liste figée
@@ -45,6 +46,7 @@ const ASPECTS: VideoAspect[] = ['origine', '9:16', '2:3', '3:4', '1:1', '16:9']
 type VTab = 'creer' | 'ambiance' | 'rejouer' | 'etendre'
 
 export function VideoView({ onOpen }: { onOpen: (a: Asset, list: Asset[]) => void }) {
+  const edition = useEdition()
   const s = useAppStore()
   const [review, setReview] = useState<ReviewFilter>(null)
   const [cols, setCols] = useState(() => (window.innerWidth < 821 ? 2 : 5))
@@ -261,13 +263,14 @@ export function VideoView({ onOpen }: { onOpen: (a: Asset, list: Asset[]) => voi
               : t('La still bouge comme la vidéo source : seul le geste est transféré, le décor et le personnage viennent de la still.')}
           </div>
           <div className="flex gap-2">
-            <label className={`slot ${v.motionDriverFile ? 'filled' : ''}`}>
+            {!edition && <div className="text-[10.5px]" style={{ color: 'var(--muted)', lineHeight: 1.5 }}>{t('Sur la démo publique, on part d’une image générée par le studio : l’envoi de vidéos est réservé au propriétaire.')}</div>}
+            {edition && <label className={`slot ${v.motionDriverFile ? 'filled' : ''}`}>
               <span className="opt">{v.motionMode === 'replace' ? (getLang() === 'fr' ? '3-9,6 s' : '3-9.6 s') : '3-30 s'}</span>
               {v.motionRefUri ? <video src={v.motionRefUri} muted /> : <>▶＋<br />{t('Vidéo driver')}</>}
               {v.motionDriverFile && <em>{v.motionDriverFile.slice(0, 22)}</em>}
               <input type="file" accept="video/*" className="hidden"
                 onChange={e => { const f = e.target.files?.[0]; if (f) void s.uploadMotionDriver(f) }} />
-            </label>
+            </label>}
             {v.motionMode !== 'replace' && (
               <button className={`slot ${v.motionStillFile ? 'filled' : ''}`} onClick={() => setFramePick('still')}>
                 {v.motionStillUri ? <img src={v.motionStillUri} alt="" /> : <>＋<br />{t('still de départ')}</>}
@@ -324,10 +327,10 @@ export function VideoView({ onOpen }: { onOpen: (a: Asset, list: Asset[]) => voi
               {v.extendVideoUri ? <video src={v.extendVideoUri} muted /> : <>▶＋<br />{t('vidéo à prolonger')}<br /><span className="text-[8.5px]">{t('bibliothèque (clic) ou dépôt')}</span></>}
             </button>
           </div>
-          <label className="pill" style={{ fontSize: 10.5, justifyContent: 'center' }}>{t('⇪ déposer une vidéo')}
+          {edition && <label className="pill" style={{ fontSize: 10.5, justifyContent: 'center' }}>{t('⇪ déposer une vidéo')}
             <input type="file" accept="video/*" className="hidden"
               onChange={e => { const f = e.target.files?.[0]; if (f) void s.uploadExtendVideo(f) }} />
-          </label>
+          </label>}
           <div className="text-[10px] rounded-[11px] p-2" style={{ color: 'var(--muted)', background: 'var(--lv2)', lineHeight: 1.5 }}>
             {v.extendPrequel
               ? t('Première frame extraite → frame de fin : le rendu arrive dessus et se place devant le clip. Moteur Wan.')

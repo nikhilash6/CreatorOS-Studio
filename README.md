@@ -170,6 +170,8 @@ Set `CREATOROS_OWNER_KEY` to a long random string before opening the studio to v
 
 Internet visitors (anyone without the key and outside the tailnet) are limited to 5 renders per hour each, and are turned away while the public queue holds 8 jobs. A queued job shows its rank and an estimated start time. Settings → Comfy Cloud gives the owner a daily count of visitors, page views and renders, which keeps nothing personal: a visitor is a salted hash that changes every day. It also lists the latest visitor renders with their outcome and failure cause.
 
+Visitors can only start from images the studio generated itself. Uploading photos, videos, voices or music is owner-only, and the server refuses any job that points at an uploaded file, even when the request is crafted by hand. Every text a visitor sends is checked raw, before the LLM rewrites it, and again after rewriting. Anything that refers to a child or a minor age is refused (English and French, ages in digits or words, disguised spellings), along with sexual content. A visitor refused for this is blocked from rendering for the rest of the day, and the owner is notified.
+
 ComfyUI's `input/` folder may be shared with another install on the same machine. The studio keeps a register of the files it put there itself: the source picker only lists those, and a job or an image description that names any other file is refused. No JSON response shows the server's home folder; it is replaced by `~`.
 
 ## Content policy

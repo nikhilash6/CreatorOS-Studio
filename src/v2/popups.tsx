@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Asset, MediaMode } from '../types'
 import { vignetteOf } from '../components/AssetMedia'
 import { t, tServeur } from '../i18n'
+import { useEdition } from '../lib/proprietaire'
 import { corrigerFiche, NOMS_DIM, type Corrections } from '../lib/ficheCorrigee'
 
 /* ---------- Enhancer : /api/compose avec directives, remplacement explicite ---------- */
@@ -293,6 +294,7 @@ export function FramePicker({ open, onClose, assets, title, onPickAsset, onPickU
 }) {
   const [tab, setTab] = useState<'gen' | 'up'>('gen')
   const [uploads, setUploads] = useState<UploadRow[]>([])
+  const edition = useEdition()
   useEffect(() => {
     if (open && tab === 'up') void fetch('/api/uploads').then(r => r.json()).then(d => setUploads(d.uploads ?? []))
   }, [open, tab])
@@ -304,7 +306,7 @@ export function FramePicker({ open, onClose, assets, title, onPickAsset, onPickU
         <h3>{title} <button className="x" onClick={onClose}>✕</button></h3>
         <div className="wtabs">
           <button className={`wtab ${tab === 'gen' ? 'on' : ''}`} onClick={() => setTab('gen')}>{t('Générations')}</button>
-          <button className={`wtab ${tab === 'up' ? 'on' : ''}`} onClick={() => setTab('up')}>{t('Uploads')}</button>
+          {edition && <button className={`wtab ${tab === 'up' ? 'on' : ''}`} onClick={() => setTab('up')}>{t('Uploads')}</button>}
         </div>
         <div className="pkgrid">
           {tab === 'gen' && photos.map(a => (

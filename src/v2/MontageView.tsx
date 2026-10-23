@@ -12,6 +12,7 @@ import { useAppStore } from '../store/useAppStore'
 import { vignetteOf } from '../components/AssetMedia'
 import { fetchAssetsDe } from '../worker/apiWorker'
 import { t, tServeur } from '../i18n'
+import { useEdition } from '../lib/proprietaire'
 
 type Transition = 'coupe' | 'fondu' | 'noir'
 interface Plan {
@@ -37,6 +38,7 @@ const fmt = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart
 const json = async (r: Response) => { const b = await r.json().catch(() => ({})); if (!r.ok) throw new Error(tServeur(b.error) ?? `HTTP ${r.status}`); return b }
 
 export function MontageView({ onOpen, ouvrirId }: { onOpen: (a: Asset, list: Asset[]) => void; ouvrirId?: string | null }) {
+  const edition = useEdition()
   const s = useAppStore()
   const [liste, setListe] = useState<Resume[]>([])
   const [projet, setProjet] = useState<Projet | null>(null)
@@ -401,9 +403,9 @@ export function MontageView({ onOpen, ouvrirId }: { onOpen: (a: Asset, list: Ass
                   <option value="">{t('aucune')}</option>
                   {musiques.map(m => <option key={m.nom} value={m.nom}>{m.nom} ({fmt(m.duree)})</option>)}
                 </select>
-                <label className="pill tool" style={{ justifyContent: 'center', cursor: 'pointer' }}>＋ {t('ajouter une musique…')}
+                {edition && <label className="pill tool" style={{ justifyContent: 'center', cursor: 'pointer' }}>＋ {t('ajouter une musique…')}
                   <input type="file" accept="audio/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) void deposerMusique(f); e.target.value = '' }} />
-                </label>
+                </label>}
                 {d.musique && (<>
                   <audio src={`/api/montage/musiques/${encodeURIComponent(d.musique.fichier)}`} controls style={{ width: '100%', height: 32 }} />
                   <Curseur label={t('Volume de la musique')} min={0} max={1.5} pas={0.05} val={d.musique.volume} pct onChange={v => maj(x => ({ ...x, musique: x.musique && { ...x.musique, volume: v } }))} />

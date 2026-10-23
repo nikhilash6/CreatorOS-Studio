@@ -13,8 +13,10 @@ import { STYLES } from '../data/vocabularies'
 import { EnhancerPopup, ElementsPopup, FramePicker, TriagePopup, CarouselPopup, BatchViewer } from './popups'
 import { Pinceau } from '../components/Pinceau'
 import { t, tp } from '../i18n'
+import { useEdition } from '../lib/proprietaire'
 
 export function ImageView({ onOpen, goVideo }: { onOpen: (a: Asset, list: Asset[]) => void; goVideo: () => void }) {
+  const edition = useEdition()
   const s = useAppStore()
   const [review, setReview] = useState<ReviewFilter>(null)
   const [cols, setCols] = useState(() => (window.innerWidth < 821 ? 2 : 6))
@@ -151,12 +153,12 @@ export function ImageView({ onOpen, goVideo }: { onOpen: (a: Asset, list: Asset[
               <span className="text-[10.5px]" style={{ color: 'var(--muted)', lineHeight: 1.5 }}>
                 <b style={{ color: 'var(--text)' }}>{t('Image à retoucher')}</b><br />
                 <span className="inline-flex gap-1.5 mt-1">
-                  <label className="pill" style={{ fontSize: 10, padding: '4px 9px' }}>⇪ {t('Upload')}
+                  {edition && <label className="pill" style={{ fontSize: 10, padding: '4px 9px' }}>⇪ {t('Upload')}
                     <input type="file" accept="image/*" className="hidden" onChange={e => {
                       const f = e.target.files?.[0]
                       if (f) void s.uploadEditSource(f)
                     }} />
-                  </label>
+                  </label>}
                   <button className="pill" style={{ fontSize: 10, padding: '4px 9px' }} onClick={() => setSrcPick(true)}>▦ {t('Bibliothèque')}</button>
                   {(() => { const src = s.assets.find(x => x.id === s.photo.editSourceAssetId); return src
                     ? <button className="pill" style={{ fontSize: 10, padding: '4px 9px' }} onClick={() => setPinceauDe(src)}>🖌 {t('Pinceau')}</button> : null })()}

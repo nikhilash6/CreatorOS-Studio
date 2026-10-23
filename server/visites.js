@@ -58,13 +58,14 @@ export function installerVisites(app, { dataDir, estProprietaire, avecCle, profo
   try { jours = JSON.parse(fs.readFileSync(fichier, 'utf8')) } catch { /* premier jour */ }
   let sel = { jour: '', valeur: '' }, vus = new Set(), rendus = new Map()
   let pagesDe = new Map(), proprietaires = new Set()   // par empreinte, pour le jour
+  let bannis = new Set()   // empreintes refusées par le filtre de contenu : plus de rendu jusqu'à minuit
   let sale = false
   const jourDe = () => new Date().toISOString().slice(0, 10)
   // rendus = visiteurs d'Internet ; rendusProprietaire = propriétaire et tailnet (depuis le 22/10)
   const compteurs = j => (jours[j] ??= { visiteurs: 0, pages: 0, rendus: 0, rendusProprietaire: 0, refuses: 0, tailnet: 0 })
   const empreinte = req => {
     const j = jourDe()
-    if (sel.jour !== j) { sel = { jour: j, valeur: crypto.randomBytes(16).toString('hex') }; vus = new Set(); rendus = new Map(); pagesDe = new Map(); proprietaires = new Set() }
+    if (sel.jour !== j) { sel = { jour: j, valeur: crypto.randomBytes(16).toString('hex') }; vus = new Set(); rendus = new Map(); pagesDe = new Map(); proprietaires = new Set(); bannis = new Set() }
     const ip = String(req.headers['x-forwarded-for'] ?? req.ip ?? '').split(',')[0].trim()
     return crypto.createHash('sha256').update(`${sel.valeur}|${ip}|${req.headers['user-agent'] ?? ''}`).digest('hex').slice(0, 16)
   }
@@ -144,6 +145,12 @@ export function installerVisites(app, { dataDir, estProprietaire, avecCle, profo
     const c = compteurs(jourDe())
     if (duTailnet(req) || estProprietaire(req)) { c.rendusProprietaire = (c.rendusProprietaire ?? 0) + 1; sale = true; return }
     const e = empreinte(req), maintenant = Date.now()
+    if (bannis.has(e)) {
+      c.refuses++; sale = true
+      refuser('visiteur bloqué pour la journée (contenu interdit)', `${req.method} ${req.routeOptions?.url}`)
+      reply.code(403).send({ error: 'demande refusée : ce studio ne produit aucun contenu impliquant un mineur, ni de contenu sexuel' })
+      return reply
+    }
     const recents = (rendus.get(e) ?? []).filter(t => maintenant - t < 3600_000)
     if (recents.length >= RENDUS_PAR_HEURE) {
       c.refuses++; sale = true
@@ -168,4 +175,15 @@ export function installerVisites(app, { dataDir, estProprietaire, avecCle, profo
     journal: journal.slice(0, 50),
     enCours: suivis.size,
   }))
+  /* Demande refusée par le filtre de contenu : journalisée et notifiée, que la
+     requête vienne d'un visiteur ou du tailnet (23/10). */
+  return {
+    refuserContenu: (terme, route, req) => {
+      const visiteur = !estProprietaire(req) && !duTailnet(req)
+      if (visiteur) bannis.add(empreinte(req))
+      const qui = estProprietaire(req) ? 'propriétaire' : duTailnet(req) ? 'tailnet' : `visiteur ${empreinte(req).slice(0, 6)}, bloqué pour la journée`
+      noter({ type: route, statut: 'refusé', erreur: `contenu interdit (« ${terme} ») — ${qui}` })
+      void notifier('Demande refusée : contenu lié à un mineur ou sexuel', `${route} — « ${terme} » — ${qui}`, { tags: ['rotating_light'], priorite: 5 })
+    },
+  }
 }

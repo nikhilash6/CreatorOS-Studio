@@ -15,6 +15,7 @@ import { vignetteOf } from '../components/AssetMedia'
 import { useAppStore } from '../store/useAppStore'
 import { Ic, Seg, Sheet } from './bits'
 import { getLang, t } from '../i18n'
+import { useEdition } from '../lib/proprietaire'
 
 export type SourceRole = 'start' | 'end' | 'driver' | 'still' | 'extend' | 'editsrc'
 
@@ -33,6 +34,7 @@ export function MSourcePicker({ role, onClose }: { role: SourceRole; onClose: ()
   const s = useAppStore()
   const cfg = ROLE[role]
   const [tab, setTab] = useState<'lib' | 'device'>('lib')
+  const edition = useEdition()
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
@@ -76,12 +78,13 @@ export function MSourcePicker({ role, onClose }: { role: SourceRole; onClose: ()
     <Sheet title={t(cfg.title)} onClose={onClose}>
       {role === 'extend'
         ? <p className="muted" style={{ fontSize: 13 }}>{t('Un clip déjà rendu : c’est sa dernière image qui sert de départ.')}</p>
-        : <Seg value={tab} onPick={setTab} options={[['lib', t('Bibliothèque')], ['device', t('Mon téléphone')]]} />}
+        : edition ? <Seg value={tab} onPick={setTab} options={[['lib', t('Bibliothèque')], ['device', t('Mon téléphone')]]} />
+        : <p className="muted" style={{ fontSize: 13 }}>{t('Sur la démo publique, on part d’une image générée par le studio : l’envoi de fichiers est réservé au propriétaire.')}</p>}
 
       {err && <p className="err">{err}</p>}
       {busy && <p className="muted" style={{ fontSize: 14, marginTop: 10 }}>{t('transfert en cours…')}</p>}
 
-      {(tab === 'lib' || role === 'extend') ? (
+      {(tab === 'lib' || role === 'extend' || !edition) ? (
         <div className="grid" style={{ marginTop: 12, '--cols': 3 } as React.CSSProperties}>
           {list.map(a => (
             <button key={a.id} className="tile" style={{ padding: 0 }} onClick={() => void pickAsset(a)}

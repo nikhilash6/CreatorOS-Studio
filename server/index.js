@@ -44,6 +44,9 @@ const ROUTES_PROPRIETAIRE = new Set([
   'DELETE /api/personas/:id', 'POST /api/persona/lora', 'PUT /api/persona/avatar',
   'PUT /api/persona/avatar/depuis-asset', 'PUT /api/workflows/:file', 'PUT /api/prompts/:file',
   'POST /api/corbeille/vider', 'POST /api/diagnostic/figer', 'GET /api/visites',
+  // Démo publique : un visiteur ne part que des images générées par le studio, jamais
+  // de la photo d'une personne réelle ; la liste des envois n'est pas publique.
+  'POST /api/upload', 'GET /api/uploads', 'POST /api/parole/voix', 'POST /api/montage/musiques',
 ])
 const estProprietaire = req => {
   if (!CONFIG.cleProprietaire) return true
@@ -53,11 +56,37 @@ const estProprietaire = req => {
 }
 app.addHook('onRequest', async (req, reply) => {
   if (!ROUTES_PROPRIETAIRE.has(`${req.method} ${req.routeOptions?.url}`) || estProprietaire(req)) return
-  reply.code(403).send({ error: 'réservé au propriétaire du studio' })
+  const envoi = /^POST \/api\/(upload|parole\/voix|montage\/musiques)$/.test(`${req.method} ${req.routeOptions?.url}`)
+  reply.code(403).send({ error: envoi
+    ? 'sur la démo publique, on part d’une image générée par le studio : l’envoi de fichiers est réservé au propriétaire'
+    : 'réservé au propriétaire du studio' })
 })
 app.post('/api/proprietaire', async req => ({ verrou: !!CONFIG.cleProprietaire, proprietaire: estProprietaire(req) }))
 // visiteurs par jour, limite de rendus des visiteurs Internet (cf. visites.js)
-installerVisites(app, { dataDir: CONFIG.dataDir, estProprietaire, avecCle: () => !!CONFIG.cleProprietaire, profondeurFile: () => queueDepth(), lireJob: id => store.getJob(id) })
+const { refuserContenu } = installerVisites(app, { dataDir: CONFIG.dataDir, estProprietaire, avecCle: () => !!CONFIG.cleProprietaire, profondeurFile: () => queueDepth(), lireJob: id => store.getJob(id) })
+
+/* Filtre de contenu sur le texte BRUT de chaque demande (23/10) : avant, le
+   contrôle ne portait que sur le prompt réécrit, que le modèle de langue avait
+   « adouci », et un terme interdit pouvait passer. Tout texte envoyé à l'API est lu, sauf
+   les négatifs (qui nomment justement ce qu'on exclut) et les réglages du
+   propriétaire (recettes, textes, personnages). */
+const sansFiltreContenu = new Set([...ROUTES_PROPRIETAIRE, 'POST /api/proprietaire'])
+function texteInterdit(v, cle = '') {
+  if (/negati/i.test(cle)) return null
+  if (typeof v === 'string') return t0Hit(v)
+  if (Array.isArray(v)) { for (const x of v) { const h = texteInterdit(x, cle); if (h) return h } return null }
+  if (v && typeof v === 'object') { for (const [k, x] of Object.entries(v)) { const h = texteInterdit(x, k); if (h) return h } }
+  return null
+}
+app.addHook('preHandler', async (req, reply) => {
+  if (req.method !== 'POST' && req.method !== 'PUT') return
+  const route = `${req.method} ${req.routeOptions?.url}`
+  if (!req.url.startsWith('/api/') || sansFiltreContenu.has(route) || Buffer.isBuffer(req.body)) return
+  const terme = texteInterdit(req.body) ?? texteInterdit(req.query)
+  if (!terme) return
+  refuserContenu(terme, route, req)
+  return reply.code(400).send({ error: 'demande refusée : ce studio ne produit aucun contenu impliquant un mineur, ni de contenu sexuel' })
+})
 
 /* Aucune réponse JSON ne montre le dossier personnel du serveur (chemins des
    recettes, de la base, messages d'erreur de ffmpeg ou de ComfyUI) : il est
@@ -304,7 +333,8 @@ app.post('/api/compose', async (req, reply) => {
   {
     const pathz = await import('node:path')
     let abs = null
-    if (typeof anchorFile === 'string' && anchorFile.trim() && store.estInputStudio(pathz.basename(anchorFile)))
+    if (typeof anchorFile === 'string' && anchorFile.trim()
+        && (estProprietaire(req) ? store.estInputStudio : store.estInputGenere)(pathz.basename(anchorFile)))
       abs = pathz.join(CONFIG.comfyInput, pathz.basename(anchorFile))
     else if (typeof anchorUri === 'string' && anchorUri.startsWith('/media/'))
       abs = pathz.join(CONFIG.mediaDir, pathz.basename(anchorUri))
@@ -572,7 +602,7 @@ app.post('/api/upload', async (req, reply) => {
   const filename = `crs_${Date.now().toString(36)}_${stem}${ext}`
   fs.mkdirSync(CONFIG.comfyInput, { recursive: true })
   fs.writeFileSync(path.join(CONFIG.comfyInput, filename), buf)
-  store.noterInput(filename)
+  store.noterInput(filename, 'upload')
   const { width, height } = imageSize(buf)
   // Vidéo (driver) : durée et images telles que la chaîne motion les verra,
   // pour l'estimation avant envoi.
@@ -773,12 +803,15 @@ app.post('/api/cloud/taches/:id', async req => tacheCloud(exigerCle(req), req.pa
    un job déposé par l'API ne nomme que des fichiers que ce studio y a mis
    lui-même (registre inputs_studio), sinon un visiteur pourrait animer ou
    faire décrire l'image d'un autre. */
-function inputEtranger(b) {
+/* Visiteur (sans la clé) : seulement ce que le studio a généré lui-même — jamais
+   un upload, même ancien : jamais la photo d'une personne réelle. */
+function inputEtranger(b, proprietaire) {
   const noms = [b.sourceImage, b.endImage, b.motionDriver, b.motionRef, b.concatFrom === 'input' ? b.concatWith : null]
-  return noms.find(n => typeof n === 'string' && n.trim() && !store.estInputStudio(path.basename(n.trim()))) ?? null
+  const admis = n => proprietaire ? store.estInputStudio(n) : store.estInputGenere(n)
+  return noms.find(n => typeof n === 'string' && n.trim() && !admis(path.basename(n.trim()))) ?? null
 }
 app.post('/api/jobs', async (req, reply) => {
-  const etranger = inputEtranger(req.body || {})
+  const etranger = inputEtranger(req.body || {}, estProprietaire(req))
   if (etranger) { reply.code(400); return { error: `« ${path.basename(etranger)} » absent du dossier input/` } }
   try {
     const r = await deposerAvecCle(cleComfy(req), () => enqueueParPlans(req.body || {}))   // une vidéo de mouvement montée part en un job par plan
@@ -1598,13 +1631,17 @@ setInterval(purgerCorbeille, 6 * 3600_000).unref()
    dernière demi-seconde (le flou de mouvement de fin conditionne tout le
    rendu). Netteté mesurée par l'énergie de contours (sobel + signalstats,
    une passe ffmpeg) — métrique relative, comparée dans la fenêtre. */
+/** Une image tirée d'une vidéo hérite de son origine : un rendu de la bibliothèque
+ *  donne « genere », un fichier de input/ garde celle de son dépôt. */
+const origineDe = videoPath => path.dirname(path.resolve(videoPath)) === path.resolve(CONFIG.comfyInput)
+  ? (store.origineInput(path.basename(videoPath)) ?? 'inconnu') : 'genere'
 function extractLastFrame(videoPath, pick = 'last') {
   /* Prequel (20/10) : la PREMIÈRE frame, qui devient la frame de fin du rendu. */
   if (pick === 'first') {
     const stem = path.basename(videoPath).replace(/\.[^.]*$/, '').replace(/[^\w-]+/g, '_').slice(0, 40)
     const filename = `crs_firstframe_${Date.now().toString(36)}_${stem}.png`
     execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', videoPath, '-vframes', '1', path.join(CONFIG.comfyInput, filename)])
-    store.noterInput(filename)
+    store.noterInput(filename, origineDe(videoPath))
     const { width, height } = imageSize(fs.readFileSync(path.join(CONFIG.comfyInput, filename)))
     return { filename, width, height, warn: null }
   }
@@ -1627,7 +1664,7 @@ function extractLastFrame(videoPath, pick = 'last') {
   const filename = `crs_lastframe_${Date.now().toString(36)}_${stem}.png`
   execFileSync('ffmpeg', ['-v', 'error', '-y', '-ss', String(Math.max(0, dur - win)), '-i', videoPath,
     '-vf', `select=eq(n\\,${idx})`, '-vframes', '1', path.join(CONFIG.comfyInput, filename)])
-  store.noterInput(filename)
+  store.noterInput(filename, origineDe(videoPath))
   const buf = fs.readFileSync(path.join(CONFIG.comfyInput, filename))
   const { width, height } = imageSize(buf)
   return { filename, width, height, framesFromEnd: last - idx, lastScore: scores[last], maxScore,
@@ -1641,7 +1678,7 @@ app.post('/api/input/last-frame', async (req, reply) => {
   const f = String(req.body?.file || '').trim()
   if (!f || /[\\/]/.test(f) || f.startsWith('.')) { reply.code(400); return { error: 'nom de fichier nu attendu (dossier input/)' } }
   const full = path.join(CONFIG.comfyInput, f)
-  if (!store.estInputStudio(f) || !fs.existsSync(full)) { reply.code(404); return { error: `« ${f} » absent du dossier input/` } }
+  if (!(estProprietaire(req) ? store.estInputStudio : store.estInputGenere)(f) || !fs.existsSync(full)) { reply.code(404); return { error: `« ${f} » absent du dossier input/` } }
   try { return extractLastFrame(full, ['sharp', 'first'].includes(req.body?.pick) ? req.body.pick : 'last') }
   catch (e) { reply.code(422); return { error: String(e.message || e) } }
 })
@@ -1929,7 +1966,7 @@ app.post('/api/parole/voix', async (req, reply) => {
   if (req.body.length > 30 * 1024 * 1024) { reply.code(413); return { error: 'fichier > 30 Mio' } }
   const nom = `crs_voix_${Date.now().toString(36)}${ext}`
   fs.writeFileSync(path.join(CONFIG.comfyInput, nom), req.body)
-  store.noterInput(nom)
+  store.noterInput(nom, 'voix')
   let duree = 0
   try { duree = Number(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', path.join(CONFIG.comfyInput, nom)], { encoding: 'utf8' }).trim()) || 0 } catch { /* illisible */ }
   if (!duree) { fs.rmSync(path.join(CONFIG.comfyInput, nom), { force: true }); reply.code(422); return { error: 'audio illisible' } }

@@ -526,6 +526,22 @@ if (inputsNeuf) {
     for (const m of String(payload).matchAll(/crs_[\w.-]+?\.(?:png|jpe?g|webp|mp4|mov|webm)/gi)) noms.add(m[0])
   for (const n of noms) noterInputStmt.run(n, Date.now())
 }
-export function noterInput(nom) { noterInputStmt.run(String(nom), Date.now()) }
-const estInputStmt = db.prepare('SELECT 1 FROM inputs_studio WHERE nom = ?')
+/* Origine de chaque dépôt (23/10) : « genere » pour ce que le studio tire de ses
+   propres rendus (still, première/dernière image, suite), « upload » pour un
+   fichier envoyé, « voix » pour une voix. Un visiteur ne part que de « genere ».
+   Les noms d'avant cette colonne sont classés par leur forme ; une image tirée
+   d'une vidéo dont on ignore la source reste « inconnu », donc refusée. */
+if (!db.prepare(`SELECT 1 FROM pragma_table_info('inputs_studio') WHERE name = 'origine'`).get())
+  db.exec(`ALTER TABLE inputs_studio ADD COLUMN origine TEXT`)
+db.exec(`UPDATE inputs_studio SET origine = CASE
+    WHEN nom LIKE 'crs!_still!_%' ESCAPE '!' OR nom LIKE 'crs!_suite!_%' ESCAPE '!' THEN 'genere'
+    WHEN nom LIKE 'crs!_voix!_%' ESCAPE '!' THEN 'voix'
+    WHEN nom LIKE 'crs!_lastframe!_%' ESCAPE '!' OR nom LIKE 'crs!_firstframe!_%' ESCAPE '!' THEN 'inconnu'
+    ELSE 'upload' END
+  WHERE origine IS NULL`)
+const noterInputOrigineStmt = db.prepare('INSERT INTO inputs_studio (nom, at, origine) VALUES (?, ?, ?) ON CONFLICT(nom) DO UPDATE SET origine = excluded.origine')
+export function noterInput(nom, origine = 'genere') { noterInputOrigineStmt.run(String(nom), Date.now(), origine) }
+const estInputStmt = db.prepare('SELECT origine FROM inputs_studio WHERE nom = ?')
 export function estInputStudio(nom) { return !!estInputStmt.get(String(nom)) }
+export function origineInput(nom) { return estInputStmt.get(String(nom))?.origine ?? null }
+export function estInputGenere(nom) { return origineInput(nom) === 'genere' }
