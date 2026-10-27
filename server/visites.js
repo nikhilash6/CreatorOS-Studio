@@ -24,7 +24,12 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import { notifier } from './notif.js'
 
-const RENDUS_PAR_HEURE = 5     // par visiteur Internet
+/* Par visiteur Internet et par heure, un rendu = une image ou un clip LANCÉ (24/10) :
+   avant, on comptait les demandes, et ×4, un carrousel ou un reel passaient pour 1. */
+const RENDUS_PAR_HEURE = 12
+/* Coût plancher d'une demande dont les jobs naissent plus tard (le reel planifie ses
+   plans après la réponse) : 5 photos + 5 clips en moyenne. */
+const COUT_MINIMUM = { 'POST /api/reels': 10 }
 const FILE_MAX_PUBLIC = 8      // au-delà, un visiteur Internet attend que la file se vide
 
 /** Les routes qui lancent un rendu sur le GPU. */
@@ -106,6 +111,12 @@ export function installerVisites(app, { dataDir, estProprietaire, avecCle, profo
     try { corps = JSON.parse(payload) } catch { return payload }
     const lances = [...idsDe(corps)].map(id => lireJob(id)).filter(Boolean)
     for (const row of lances) suivis.set(row.id, { depuis: Date.now(), route: req.rendusVisiteur })
+    // ce que la demande a réellement lancé, compté au visiteur pour l'heure qui vient
+    const cout = Math.max(lances.length, COUT_MINIMUM[req.rendusVisiteur] ?? 1)
+    const liste = rendus.get(req.empreinteVisiteur) ?? []
+    for (let i = 0; i < cout; i++) liste.push(Date.now())
+    rendus.set(req.empreinteVisiteur, liste)
+    compteurs(jourDe()).rendus += cout; sale = true
     if (lances.length) {
       const types = [...new Set(lances.map(typeDe))].join(', ')
       void notifier('Un visiteur lance un rendu', `${types}${lances.length > 1 ? ` (${lances.length} jobs)` : ''} · file : ${profondeurFile()}`, { tags: ['art'] })
@@ -155,7 +166,7 @@ export function installerVisites(app, { dataDir, estProprietaire, avecCle, profo
     if (recents.length >= RENDUS_PAR_HEURE) {
       c.refuses++; sale = true
       refuser(`limite de ${RENDUS_PAR_HEURE} rendus par heure atteinte`, `${req.method} ${req.routeOptions?.url}`)
-      reply.code(429).send({ error: `limite de la démo publique : ${RENDUS_PAR_HEURE} rendus par heure et par visiteur` })
+      reply.code(429).send({ error: `limite de la démo publique : ${RENDUS_PAR_HEURE} images ou clips par heure et par visiteur` })
       return reply
     }
     if (profondeurFile() >= FILE_MAX_PUBLIC) {
@@ -164,11 +175,23 @@ export function installerVisites(app, { dataDir, estProprietaire, avecCle, profo
       reply.code(503).send({ error: 'le GPU de la démo est occupé : réessaie dans quelques minutes' })
       return reply
     }
-    recents.push(maintenant); rendus.set(e, recents); c.rendus++; sale = true
+    rendus.set(e, recents)   // le coût est ajouté à la réponse, quand on sait combien de rendus sont partis
+    req.empreinteVisiteur = e
     req.rendusVisiteur = `${req.method} ${req.routeOptions?.url}`
   })
 
   // réservée au propriétaire (cf. ROUTES_PROPRIETAIRE)
+  /* Ce qui reste au visiteur pour l'heure (24/10) : affiché dans l'en-tête, à côté
+     du voyant machine. Le propriétaire et le tailnet n'ont pas de limite. */
+  app.get('/api/quota', async req => {
+    if (estProprietaire(req) || duTailnet(req)) return { illimite: true, limite: RENDUS_PAR_HEURE }
+    const e = empreinte(req), maintenant = Date.now()
+    const recents = (rendus.get(e) ?? []).filter(t => maintenant - t < 3600_000).sort((x, y) => x - y)
+    const restants = Math.max(0, RENDUS_PAR_HEURE - recents.length)
+    // quand la limite est atteinte : dans combien de temps le plus ancien rendu sort de l'heure
+    const libreDansMs = restants > 0 ? 0 : Math.max(0, recents[recents.length - RENDUS_PAR_HEURE] + 3600_000 - maintenant)
+    return { illimite: false, limite: RENDUS_PAR_HEURE, restants, libreDansMs, bloque: bannis.has(e) }
+  })
   app.get('/api/visites', async () => ({
     jours: Object.entries(jours).sort(([a], [b]) => b.localeCompare(a)).map(([jour, c]) => ({ jour, ...c })),
     limites: { rendusParHeure: RENDUS_PAR_HEURE, fileMaxPublic: FILE_MAX_PUBLIC },

@@ -53,6 +53,42 @@ const AGE_LETTRES = /\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleve
 // 1 → i, 3 → e, 4 → a, 0 → o, 5 → s, 7 → t, @ → a : « k1d », « t33n », « l0li »
 const DECHIFFRER = t => t.replace(/[1!|]/g, 'i').replace(/3/g, 'e').replace(/[4@]/g, 'a').replace(/0/g, 'o').replace(/5|\$/g, 's').replace(/7/g, 't')
 
+/* Sexuel :
+   l'application ne produit que du SFW. Mots entiers, puis expressions. */
+export const T0_SEXE_MOTS = [
+  'cock', 'cocks', 'dick', 'dicks', 'penis', 'penises', 'phallus', 'pussy', 'pussies', 'vagina', 'vaginal', 'vulva', 'clit', 'clitoris',
+  'anus', 'anal', 'ass', 'asshole', 'tits', 'titty', 'titties', 'boob', 'boobs', 'nipple', 'nipples', 'areola', 'areolas',
+  'cum', 'cumming', 'cumshot', 'semen', 'sperm', 'ejaculate', 'ejaculating', 'ejaculation', 'orgasm', 'orgasms', 'orgasmic',
+  'masturbate', 'masturbating', 'masturbation', 'fingering', 'blowjob', 'blowjobs', 'handjob', 'footjob', 'deepthroat', 'fellatio', 'cunnilingus',
+  'suck', 'sucks', 'sucking', 'sucked', 'sex', 'sexual', 'sexually', 'intercourse', 'fuck', 'fucks', 'fucking', 'fucked',
+  'horny', 'aroused', 'arousal', 'erection', 'erect', 'hardon', 'bdsm', 'bondage', 'kinky', 'kink', 'xxx', 'hentai', 'ecchi',
+  'onlyfans', 'escort', 'stripper', 'strippers', 'upskirt', 'panties', 'thong', 'gstring', 'cameltoe', 'braless', 'undress', 'undresses',
+  'unbutton', 'unbuttons', 'unbuttoning', 'unbuttoned', 'unzip', 'unzips', 'unzipping', 'strips', 'nudes', 'naked', 'nakedness', 'genitals',
+  'pénis', 'vagin', 'clito', 'sexe', 'sexuel', 'sexuelle', 'sexuels', 'seins', 'nichons', 'bite', 'chatte', 'sucer', 'suce', 'sucent',
+  'fellation', 'sodomie', 'sodomise', 'éjacule', 'éjaculation', 'sperme', 'masturbe', 'masturbation', 'baise', 'baiser', 'baisent', 'branlette',
+  'déshabille', 'déshabiller', 'déshabillée', 'déboutonne', 'déboutonner', 'déboutonnée', 'culotte', 'excitée', 'érection', 'porno',
+]
+export const T0_SEXE_EXPRESSIONS = [
+  'on her knees in front of', 'kneeling in front of a man', 'between his legs', 'between her legs', 'spread legs', 'spreads her legs',
+  'spreading her legs', 'legs spread', 'takes off her', 'taking off her', 'removes her top', 'removes her shirt', 'removes her bra',
+  'removes her clothes', 'pulls down her', 'lifts her skirt', 'lifts up her skirt', 'no bra', 'without a bra', 'wet t-shirt', 'bare breasts',
+  'bare chest', 'strip club', 'strip tease', 'see through', 'transparent top', 'oral sex', 'making love', 'make love',
+  'à genoux devant', 'entre ses jambes', 'jambes écartées', 'écarte les jambes', 'enlève son haut', 'retire son haut', 'enlève sa chemise',
+  'retire sa chemise', 'sans soutien-gorge', 'faire l’amour', "faire l'amour", 'fait l’amour', "fait l'amour",
+]
+
+/** Rend le terme sexuel trouvé, ou null. */
+export function t0Sexe(text) {
+  const lower = String(text ?? '').toLowerCase().normalize('NFC')
+  // « without clothes » et ses fautes de frappe
+  const sansHabits = lower.match(/\b(?:w\w{0,3}out|with out|no|not wearing any|zero)\s+(?:any\s+)?(?:clothes|clothing|clothe|outfit|garments?)\b|\b(?:clothes|clothing)\s+off\b|\bsans\s+(?:aucun\s+)?(?:vêtements?|habits?)\b/u)
+  if (sansHabits) return sansHabits[0]
+  const exp = T0_SEXE_EXPRESSIONS.find(e => lower.includes(e))
+  if (exp) return exp
+  const mots = new Set([...lower.split(/[^\p{L}\p{N}@$!|]+/u), ...DECHIFFRER(lower).split(/[^\p{L}\p{N}]+/u), ...lower.replace(/[-_.]/g, '').split(/[^\p{L}\p{N}]+/u)])
+  return T0_SEXE_MOTS.find(m => mots.has(m)) ?? null
+}
+
 /** Rend le terme d'enfance trouvé, ou null. */
 export function t0Enfance(text) {
   const lower = String(text ?? '').toLowerCase().normalize('NFC')
@@ -68,6 +104,8 @@ export function t0Enfance(text) {
 export function t0Hit(text) {
   const enfance = t0Enfance(text)
   if (enfance) return enfance
+  const sexe = t0Sexe(text)
+  if (sexe) return sexe
   const lower = String(text ?? '').toLowerCase()
   const sous = T0_BLOCKLIST.find(term => lower.includes(term))
   if (sous) return sous

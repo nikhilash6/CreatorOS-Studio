@@ -7,7 +7,7 @@ A self-hosted creative studio for one recurring character, from a one-line brief
 Built for the Comfy **#OpenSourceHiggsfield** challenge.
 
 - **Demo video (1:59)**: https://youtu.be/axHdAXHv3Kk
-- **Try it**: https://forge.taila06702.ts.net:8443 — the public demo runs on the author's own GPU, one render at a time, 5 renders per hour per visitor.
+- **Try it**: https://forge.taila06702.ts.net:8443 — the public demo runs on the author's own GPU, one render at a time, 12 images or clips per hour per visitor.
 - **Run it yourself**: see [Install](#install).
 
 CreatorOS Studio is the public, general-audience edition of a production tool used daily. It keeps the production recipes and the operator workflow. Private content and the original character are not included.
@@ -168,7 +168,7 @@ Only use a character you own: a fictional one you created, or yourself.
 
 Set `CREATOROS_OWNER_KEY` to a long random string before opening the studio to visitors. With a key, the Creator page, the characters and their wardrobe, LoRA uploads, profile photos, recipes and shaping texts are read-only: those writes answer 403 unless the request carries the exact key in an `X-Owner-Key` header. The owner enters the key once in Settings → Comfy Cloud; it stays in that browser. Visitors keep rendering, reviewing, editing and exporting. Without a key nothing is locked, which suits a single-user install.
 
-Internet visitors (anyone without the key and outside the tailnet) are limited to 5 renders per hour each, and are turned away while the public queue holds 8 jobs. A queued job shows its rank and an estimated start time. Settings → Comfy Cloud gives the owner a daily count of visitors, page views and renders, which keeps nothing personal: a visitor is a salted hash that changes every day. It also lists the latest visitor renders with their outcome and failure cause.
+Internet visitors (anyone without the key and outside the tailnet) are limited to 12 images or clips per hour each (a ×4 take counts as 4, a one-click reel as about 10), and are turned away while the public queue holds 8 jobs. A queued job shows its rank and an estimated start time. Settings → Comfy Cloud gives the owner a daily count of visitors, page views and renders, which keeps nothing personal: a visitor is a salted hash that changes every day. It also lists the latest visitor renders with their outcome and failure cause.
 
 Visitors can only start from images the studio generated itself. Uploading photos, videos, voices or music is owner-only, and the server refuses any job that points at an uploaded file, even when the request is crafted by hand. Every text a visitor sends is checked raw, before the LLM rewrites it, and again after rewriting. Anything that refers to a child or a minor age is refused (English and French, ages in digits or words, disguised spellings), along with sexual content. A visitor refused for this is blocked from rendering for the rest of the day, and the owner is notified.
 

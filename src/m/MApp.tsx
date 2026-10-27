@@ -11,6 +11,7 @@
    ============================================================ */
 import { PersonaMenu } from '../components/PersonaMenu'
 import { LangSwitch } from '../components/LangSwitch'
+import { QuotaDemo } from '../components/QuotaDemo'
 import { UndoDelete } from '../components/UndoDelete'
 import { RenderIsland, RenderRing, useTabTitle } from '../components/RenderWatch'
 import { STATUTS_ACTIFS } from '../types'
@@ -104,8 +105,10 @@ export default function MApp() {
     <div className="m">
       <header className="top">
         <span className="logo">Creator<i>OS</i></span>
+        <span style={{ marginLeft: 'auto' }} />
+        <QuotaDemo style={{ fontSize: 12, opacity: 0.85 }} />
         <button className="tap-sm" aria-label={t('parcours guidé')} onClick={() => setParcours(true)}
-          style={{ marginLeft: 'auto', marginRight: 6, background: 'none', border: 0, color: 'inherit', fontSize: 17, opacity: 0.75, minWidth: 36, minHeight: 36 }}>?</button>
+          style={{ marginLeft: 6, marginRight: 6, background: 'none', border: 0, color: 'inherit', fontSize: 17, opacity: 0.75, minWidth: 36, minHeight: 36 }}>?</button>
         <LangSwitch style={{ marginRight: 8 }} />
         <PersonaMenu alignDroite onEdit={() => setSpace('atelier')} className="persona tap-sm" style={{ minHeight: 40 }} />
       </header>

@@ -27,6 +27,7 @@ import { ConfigView } from '../features/config/ConfigView'
 import { CreateurView } from '../features/createur/CreateurView'
 import { useTelemetry } from '../components/shell/useTelemetry'
 import { VoyantMachine } from './Diagnostic'
+import { QuotaDemo } from '../components/QuotaDemo'
 import { Ic } from './bits'
 import { Parcours, parcoursDejaVu } from '../components/Parcours'
 import { t } from '../i18n'
@@ -136,6 +137,7 @@ export default function V2App() {
         <div className="ml-auto flex items-center gap-3 text-[11px]" style={{ color: 'var(--faint)' }}>
           <Telemetry />
           {activeJobs > 0 && <span style={{ color: 'var(--accent)' }}>{t('{n} en rendu', { n: activeJobs })}</span>}
+          <QuotaDemo />
           <VoyantMachine />
           <button title={t('parcours guidé')} aria-label={t('parcours guidé')} onClick={() => setParcours(true)}
             style={{ background: 'none', border: 0, cursor: 'pointer', color: 'var(--muted)', display: 'flex' }}><Ic n="help" s={15} /></button>
