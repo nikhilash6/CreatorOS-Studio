@@ -166,9 +166,14 @@ export function personas() {
  *  description fixe. `null` quand le personnage n'en a pas — l'injection ne
  *  signale alors rien (cf. comfy.injectJob). La clé publiée en provenance dit
  *  d'où vient le texte. */
+/* Ancre d'âge (30/10) : un prompt qui ne nomme personne (« mustard raincoat, rainy street »)
+   a donné une silhouette d'enfant sur un personnage sans préambule. Tous les personnages
+   du studio sont des femmes adultes : chaque rendu le dit, sauf si le préambule donne un âge. */
+const ADULTE = 'an adult woman in her mid-twenties'
 export function identityPreambleFor(id) {
   const p = persona(id)
-  const text = [p.trigger, p.preamble].filter(Boolean).join(', ')
+  const age = /\b(adult|\d{2}[- ]?(years?|yo))\b/i.test(p.preamble ?? '') ? null : ADULTE
+  const text = [p.trigger, p.preamble, p.trigger || p.preamble ? age : null].filter(Boolean).join(', ')
   return text ? { key: 'persona', file: null, text: `${text}, ` } : null
 }
 

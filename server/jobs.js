@@ -2262,7 +2262,7 @@ async function runJob(job, isRetry = false, connRetried = false) {
       /* + le préambule du personnage (20/10) : certaines LoRA vidéo ont appris une
          phrase entière (« Aisha-AW, she has dark hair »), que le champ mot
          déclencheur, réduit à un jeton, ne peut pas porter. */
-      : isVideo ? (persoVideo.length && p.trigger ? { key: 'persona-video', file: null, text: `${p.trigger}, ${p.preamble ? `${p.preamble}, ` : ''}` } : null)
+      : isVideo ? (persoVideo.length && p.trigger ? { key: 'persona-video', file: null, text: `${p.trigger}, ${p.preamble ? `${p.preamble}, ` : ''}an adult woman in her mid-twenties, ` } : null)
       : identityPreambleFor(job.personaId)
 
     // Mots déclencheurs des LoRA empilées par le JOB. C'est LE point qui décide
