@@ -66,6 +66,7 @@
   background: var(--lv1); color: var(--muted); cursor: pointer; border: 0;
 }
 .v2 .spill:hover { background: var(--lv2); color: var(--text); transform: translateY(-1px); }
+.v2 .pill.on { background: var(--lv3); color: var(--text); border-color: var(--lv4); }
 .v2 .spill.on { background: var(--lv3); color: var(--text); }
 .v2 .spill.ok.on, .v2 .spill.ok:hover { color: var(--positif); }
 .v2 .spill.ko.on, .v2 .spill.ko:hover { color: var(--danger); }

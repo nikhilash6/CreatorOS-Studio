@@ -1,0 +1,80 @@
+{
+ "carte": "NVIDIA GeForce RTX 5090, 32607 MiB",
+ "le": "2026-10-30",
+ "cas": [
+  {
+   "id": "photo_krea",
+   "titre": "Photo · Krea 2",
+   "type": "photo",
+   "moteur": "krea",
+   "jobId": "cli-mvur3sqovvi9",
+   "statut": "done",
+   "secondes": 18.6,
+   "vramCreteGo": 19.3,
+   "media": "a-cli-mvur3sqovvi9-0",
+   "url": "http://127.0.0.1:8787/media/cli-mvur3sqovvi9-0-c765795b.png",
+   "vignette": "photo_krea.jpg"
+  },
+  {
+   "id": "photo_klein9",
+   "titre": "Photo · FLUX.2 Klein 9B",
+   "type": "photo",
+   "moteur": "klein",
+   "jobId": "cli-mvur4abqro41",
+   "statut": "done",
+   "secondes": 7.2,
+   "vramCreteGo": 17.8,
+   "media": "a-cli-mvur4abqro41-0",
+   "url": "http://127.0.0.1:8787/media/cli-mvur4abqro41-0-6f028c09.png",
+   "vignette": "photo_klein9.jpg"
+  },
+  {
+   "id": "video_wan",
+   "titre": "Image to video · Wan 2.2 A14B fp8",
+   "type": "video",
+   "moteur": "wan",
+   "depuis": "photo_krea",
+   "jobId": "cli-mvur4j3phzyh",
+   "statut": "done",
+   "secondes": 224.7,
+   "vramCreteGo": 25.3,
+   "media": "a-cli-mvur4j3phzyh-0",
+   "url": "http://127.0.0.1:8787/media/cli-mvur4j3phzyh-0-17ddc75c.mp4",
+   "vignette": "video_wan.jpg"
+  },
+  {
+   "id": "video_ltx",
+   "titre": "Image to video + sound · LTX-2.5 22B",
+   "type": "video",
+   "moteur": "ltx_hq",
+   "depuis": "photo_krea",
+   "jobId": "cli-mvur9g1o69qs",
+   "statut": "done",
+   "secondes": 110.2,
+   "vramCreteGo": 29.6,
+   "media": "a-cli-mvur9g1o69qs-0",
+   "url": "http://127.0.0.1:8787/media/cli-mvur9g1o69qs-0-84bac455.mp4",
+   "vignette": "video_ltx.jpg"
+  },
+  {
+   "id": "photo_klein9_12go",
+   "titre": "Photo · FLUX.2 Klein 4B (12 GB card)",
+   "type": "photo",
+   "statut": "done",
+   "secondes": 6.4,
+   "vramCreteGo": 10.7,
+   "remplaces": [
+    [
+     "flux-2-klein-9b-fp8.safetensors",
+     "flux-2-klein-4b.safetensors"
+    ],
+    [
+     "qwen_3_8b_fp8mixed.safetensors",
+     "qwen_3_4b.safetensors"
+    ]
+   ],
+   "sortie": "labo12/photo_klein9_00002_.png",
+   "vignette": "photo_klein9_12go.jpg"
+  }
+ ]
+}

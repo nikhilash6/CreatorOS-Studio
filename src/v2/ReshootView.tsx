@@ -119,6 +119,8 @@ function CoteACote({ avant, apres }: { avant: string | null; apres: string }) {
 export function ReshootView() {
   const s = useAppStore()
   const [clip, setClip] = useState<Asset | null>(null)
+  // « Utiliser dans… » depuis la visionneuse : ce clip est déjà choisi
+  useEffect(() => { const a = useAppStore.getState().prendrePasserelle('reshoot'); if (a) setClip(a) }, [])
   const [angle, setAngle] = useState('droite')
   const [pose, setPose] = useState<Pose>({ az: 35, el: 0 })
   const [cles, setCles] = useState<Pose[] | null>(null)       // mouvement : pose de début, pose de fin

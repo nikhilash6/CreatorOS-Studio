@@ -4,6 +4,7 @@
    en SQLite (pas en mémoire) : un redémarrage ne perd rien de
    ce qui est déjà produit.
    ============================================================ */
+import { PROFILS, profilDuJob } from './allege.js'
 import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
@@ -701,6 +702,8 @@ export function enqueue(job) {
     prequel: mode === 'video' && !isMotion && job.prequel === true,
     // recette photo demandée (Krea 2 / FLUX.2 Klein) : décide aussi des LoRA d'identité empilées
     photoEngine: mode === 'photo' && op !== 'edit' && RECIPES_PAR_MOTEUR[job.photoEngine] ? job.photoEngine : undefined,
+    // banc basse VRAM : profil forcé pour CE job (le serveur ne le laisse passer qu'au propriétaire)
+    profilVram: PROFILS.includes(Number(job.profilVram)) ? Number(job.profilVram) : undefined,
     motionDriver: isMotion ? job.motionDriver.trim() : null,
     motionPreview: isMotion ? Boolean(job.motionPreview) : null,
     // Move (animate) : la still fournie rejoue le geste du driver.
@@ -2006,8 +2009,9 @@ async function pump() {
      local ; sinon ComfyUI local, la carte arbitrée avec Ollama (gpu.js). */
   const cle = clesComfy.get(job.id)
   try {
-    if (cle || sdk.TRANSPORT === 'sdk') await sdk.avecSdk(cle, () => runJob(job))
-    else await pourRendu(job, () => runJob(job))
+    const lancer = () => profilDuJob.run(job.profilVram ?? null, () => runJob(job))
+    if (cle || sdk.TRANSPORT === 'sdk') await sdk.avecSdk(cle, lancer)
+    else await pourRendu(job, lancer)
   } catch (e) { console.error('[job]', job.id, String(e?.message ?? e).slice(0, 500)) }
   finally { clesComfy.delete(job.id) }
   if (job.motionPlan) await assemblerPlans(job).catch(e => console.warn(`[plans] montage non produit — ${String(e.message || e).slice(0, 300)}`))

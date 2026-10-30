@@ -16,6 +16,7 @@ import { CONFIG } from './config.js'
 import { erreurExecution, erreurSoumission } from './erreurs.js'
 import { personaLoraNames } from './persona.js'
 import * as sdk from './transport-sdk.js'
+import { alleger } from './allege.js'
 
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
@@ -1296,6 +1297,12 @@ export async function promptKnown(promptId) {
 
 export async function submitPrompt(workflow, clientId) {
   if (sdk.surSdk()) return sdk.soumettre(workflow)
+  // petite carte : chargeurs lourds remplacés par leurs variantes allégées (cf. allege.js)
+  const a = await alleger(workflow)
+  if (a.remplaces.length) {
+    workflow = a.graphe
+    console.log(`[allégé] ${a.remplaces.map(([de, vers]) => `${de} → ${vers}`).join(' ; ')}`)
+  }
   const res = await fetch(CONFIG.comfyUrl + '/prompt', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

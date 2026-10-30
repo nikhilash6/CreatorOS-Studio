@@ -46,8 +46,10 @@ Options:
   --comfy <dir>     ComfyUI folder (default: $COMFY_DIR, then ~/ComfyUI)
   --groups a,b      model groups to install, skips the question (see --check for names)
   --yes             answer yes to every question (unattended)
+  --vram <GB>       size the install for this card (24, 16, 12 or 8) instead of the detected one
+  --keep-full       on a small card, also download the full-size models the light ones replace
 
-Environment: COMFY_DIR, COMFY_PYTHON, COMFY_URL, OLLAMA_URL, CREATOROS_DATA,
+Environment: COMFY_DIR, COMFY_PYTHON, COMFY_URL, OLLAMA_URL, CREATOROS_DATA, CREATOROS_VRAM,
 HF_TOKEN (gated Hugging Face repos), CREATOROS_TORCH_INDEX (override the PyTorch wheel index).`)
   process.exit(0)
 }
@@ -424,8 +426,10 @@ function verdictVram(besoin, vram) {
   return vram >= besoin ? vert(`${t}, fits your card`) : vram >= 0.75 * besoin ? jaune(`${t}, tight: slow, may run out of memory`) : rouge(`${t}, likely too big for your ${Math.round(vram / 1e9)} GB card`)
 }
 
-async function choisirGroupes(modeles, vram) {
+async function choisirGroupes(modeles, vram, profil = 24) {
   const noms = Object.keys(MANIFESTE.groupes)
+  // sous 16 Go, Klein (allégé) remplace Krea 2 comme moteur photo
+  const defaut = g => profil < 16 && g === 'photo_klein' ? true : profil < 16 && g === 'photo' ? false : MANIFESTE.groupes[g].defaut
   const lignes = noms.map((g, i) => {
     const du = modeles.filter(m => m.groupes.includes(g))
     const manque = du.filter(m => !m.present)
@@ -438,13 +442,33 @@ async function choisirGroupes(modeles, vram) {
   const imposes = valeur('--groups')
   if (imposes) return imposes.split(',').map(s => s.trim()).filter(g => noms.includes(g))
   if (CHECK) return noms
-  if (OUI) return noms.filter(g => MANIFESTE.groupes[g].defaut)
+  if (OUI) return noms.filter(defaut)
   if (!interactif) return []
-  const def = noms.map((g, i) => MANIFESTE.groupes[g].defaut ? i + 1 : null).filter(Boolean).join(',')
+  const def = noms.map((g, i) => defaut(g) ? i + 1 : null).filter(Boolean).join(',')
   const r = await demander('Groups to install (numbers, comma-separated; "a" = all, "0" = none):', def)
   if (r === '0') return []
   if (r.toLowerCase() === 'a') return noms
   return [...new Set(r.split(/[\s,]+/).map(Number).filter(n => n >= 1 && n <= noms.length).map(n => noms[n - 1]))]
+}
+
+/* Petites cartes (30/10) : le profil (24, 16, 12, 8 Go) décide quelles variantes
+   allégées du manifeste (`leger`) remplacent les modèles lourds. Le serveur fait la
+   même substitution à l'envoi (server/allege.js) ; ici on ne télécharge que ce qui
+   servira. Mêmes marches que le serveur. */
+const profilDe = o => { const go = o / 2 ** 30; return !go ? 24 : go >= 22 ? 24 : go >= 14 ? 16 : go >= 10 ? 12 : 8 }
+function selonCarte(modeles, profil) {
+  const nom = m => m.chemin.split('/').pop()
+  const tient = r => modeles.find(m => nom(m) === r)?.tient ?? 24
+  const gardees = new Set()
+  for (const r of new Set(modeles.filter(m => m.leger).map(m => m.leger.remplace))) {
+    if (profil >= tient(r)) continue
+    const vs = modeles.filter(m => m.leger?.remplace === r)
+    const passe = vs.filter(v => v.leger.pour <= profil).sort((a, b) => b.leger.pour - a.leger.pour)
+    const v = passe[0] ?? [...vs].sort((a, b) => a.leger.pour - b.leger.pour)[0]
+    if (v) gardees.add(nom(v))
+  }
+  const remplaces = new Set(modeles.filter(m => gardees.has(nom(m))).map(m => m.leger.remplace))
+  return modeles.filter(m => m.leger ? gardees.has(nom(m)) : drapeau('--keep-full') || !remplaces.has(nom(m)))
 }
 
 async function etapeGroupes(comfy, vram) {
@@ -452,7 +476,18 @@ async function etapeGroupes(comfy, vram) {
   const etat = etatModeles(comfy.dir)
   if (etat.extra.length) info(`extra_model_paths.yaml: ${etat.extra.map(s => `${s.nom} → ${tilde(s.base)}${s.defaut ? ' (default)' : ''}`).join(', ')}`)
   for (const e of controlerManifeste()) alerte(e)
-  return { ...etat, groupes: await choisirGroupes(etat.modeles, vram) }
+  const force = Number(valeur('--vram') ?? process.env.CREATOROS_VRAM)
+  const profil = [24, 16, 12, 8].includes(force) ? force : profilDe(vram)
+  if (force) vram = force * 1e9
+  const modeles = selonCarte(etat.modeles, profil)
+  const legers = modeles.filter(m => m.leger)
+  if (legers.length) {
+    info(`${profil} GB profile: ${legers.length} light model(s) replace the full-size ones (same recipes, quantized or smaller weights)`)
+    for (const m of legers) info(`  ${m.leger.remplace} → ${m.chemin}`)
+    info('the studio picks them automatically at render time; --keep-full also downloads the originals')
+  }
+  if (profil < 16) info('photos: Krea 2 (13 GB) is too big for this card, the studio uses FLUX.2 Klein instead (install photo_klein)')
+  return { ...etat, modeles, profil, groupes: await choisirGroupes(modeles, vram, profil) }
 }
 
 async function etapeModeles({ modeles, groupes }) {

@@ -5,7 +5,8 @@
     "`dossier` est la clé folder_paths de ComfyUI (models/<dossier>/ par défaut, ou un chemin déclaré dans extra_model_paths.yaml) ; `chemin` est le nom tel que la recette l'écrit, sous-dossier compris.",
     "`racine: custom_nodes` : le fichier vit dans le dossier d'un pack de nœuds, pas sous models/.",
     "`taille` en octets, relevée sur l'API Hugging Face. `gated` : dépôt à accès accepté, il faut HF_TOKEN (envoyé en en-tête Authorization, jamais dans l'URL).",
-    "`verifie` : l'URL a été contrôlée (fichier listé par l'API du dépôt, taille identique). `setup.mjs --verify-urls` refait le contrôle par requêtes HEAD."
+    "`verifie` : l'URL a été contrôlée (fichier listé par l'API du dépôt, taille identique). `setup.mjs --verify-urls` refait le contrôle par requêtes HEAD.",
+    "`leger` : variante allégée d'un modèle lourd pour les petites cartes. `remplace` = le fichier d'origine, `pour` = le plus petit profil de VRAM (Go) où elle passe, `chargeur` = la classe de nœud qui la lit, `suit` = ne sert qu'avec ce fichier. `tient` (sur l'original) = le plus petit profil où il passe encore. Le serveur (server/allege.js) remplace les chargeurs à l'envoi ; l'assistant propose les variantes quand la carte est trop petite."
   ],
   "groupes": {
     "photo": {
@@ -257,7 +258,8 @@
         "PROD_gen_sfw.json",
         "PROD_photo_hd.json"
       ],
-      "verifie": true
+      "verifie": true,
+      "tient": 16
     },
     {
       "chemin": "qwen_3_8b_fp8mixed.safetensors",
@@ -273,7 +275,8 @@
         "PROD_gen_sfw.json",
         "PROD_photo_hd.json"
       ],
-      "verifie": true
+      "verifie": true,
+      "tient": 16
     },
     {
       "chemin": "flux2-vae.safetensors",
@@ -1167,6 +1170,41 @@
         "controle"
       ],
       "recettes": [],
+      "verifie": true
+    },
+    {
+      "chemin": "flux-2-klein-4b.safetensors",
+      "dossier": "diffusion_models",
+      "url": "https://huggingface.co/Comfy-Org/Flux-2-Klein-4B/resolve/main/split_files/diffusion_models/flux-2-klein-4b.safetensors",
+      "taille": 7751105712,
+      "licence": "Apache-2.0",
+      "groupes": [
+        "photo_klein",
+        "photo_hd"
+      ],
+      "leger": {
+        "remplace": "flux-2-klein-9b-fp8.safetensors",
+        "pour": 12,
+        "chargeur": "UNETLoader"
+      },
+      "verifie": true
+    },
+    {
+      "chemin": "qwen_3_4b.safetensors",
+      "dossier": "text_encoders",
+      "url": "https://huggingface.co/Comfy-Org/Flux-2-Klein-4B/resolve/main/split_files/text_encoders/qwen_3_4b.safetensors",
+      "taille": 8044982048,
+      "licence": "Apache-2.0",
+      "groupes": [
+        "photo_klein",
+        "photo_hd"
+      ],
+      "leger": {
+        "remplace": "qwen_3_8b_fp8mixed.safetensors",
+        "pour": 12,
+        "chargeur": "CLIPLoader",
+        "suit": "flux-2-klein-4b.safetensors"
+      },
       "verifie": true
     }
   ],

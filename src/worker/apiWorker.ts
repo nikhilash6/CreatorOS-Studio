@@ -52,6 +52,7 @@ export interface ApiAsset {
   videoFps?: number
   caption?: string
   captionOptions?: CaptionOption[]
+  controle?: Asset['controle']
   folders?: string[]
 }
 
@@ -135,6 +136,8 @@ export function toAsset(a: ApiAsset, job?: Partial<Job>): Asset {
     folders: a.folders ?? undefined,
     caption: a.caption ?? undefined,
     captionOptions: a.captionOptions ?? undefined,
+    // contrôle automatique du clip (server/controle.js), absent tant qu'il n'a pas tourné
+    controle: a.controle ?? undefined,
   }
 }
 

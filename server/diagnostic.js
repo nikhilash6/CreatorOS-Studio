@@ -14,6 +14,7 @@
    Deux gravités : « bloquant » (un rendu échouera) et « alerte » (ça marche,
    mais quelque chose a changé ou va gêner).
    ============================================================ */
+import { alleger } from './allege.js'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
@@ -106,7 +107,8 @@ async function comfy(p, infos, recettes) {
   const fichiers = new Map()    // « valeur (entrée) » → recettes
   for (const f of recettes) {
     let wf
-    try { wf = JSON.parse(fs.readFileSync(path.join(CONFIG.workflowsDir, f), 'utf8')) } catch (e) {
+    // tel qu'il partira : sur une petite carte, avec ses variantes allégées (cf. allege.js)
+    try { wf = (await alleger(JSON.parse(fs.readFileSync(path.join(CONFIG.workflowsDir, f), 'utf8')))).graphe } catch (e) {
       p.push({ gravite: 'bloquant', domaine: 'recettes', quoi: `recette ${f} illisible`, conseil: String(e.message).slice(0, 120) })
       continue
     }

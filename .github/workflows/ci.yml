@@ -24,7 +24,7 @@ jobs:
         run: npm run build
       - name: Syntaxe du serveur et des scripts
         run: |
-          for f in server/*.js scripts/*.mjs scripts/installer/*.mjs; do
+          for f in server/*.js scripts/*.mjs scripts/installer/*.mjs scripts/agent/*.mjs; do
             [ -f "$f" ] && node --check "$f"
           done
       - name: Recettes (JSON valide)

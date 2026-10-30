@@ -16,6 +16,9 @@ export function PresetsView({ goVideo }: { goVideo: () => void }) {
   const [presets, setPresets] = useState<Preset[]>([])
   const [ouvert, setOuvert] = useState<Preset | null>(null)
   const [famille, setFamille] = useState<'camera' | 'effet'>('camera')
+  // « Utiliser dans… » depuis la visionneuse : la photo est déjà choisie, il reste le mouvement
+  const [photoVenue, setPhotoVenue] = useState<Asset | null>(null)
+  useEffect(() => { setPhotoVenue(useAppStore.getState().prendrePasserelle('presets')) }, [])
   useEffect(() => { void fetch('/api/presets').then(json).then(d => setPresets(d.presets ?? [])).catch(() => {}) }, [])
   const liste = presets.filter(p => p.famille === famille)
   const nom = (p: Preset) => getLang() === 'en' ? p.nomEn : p.nom
@@ -25,7 +28,9 @@ export function PresetsView({ goVideo }: { goVideo: () => void }) {
         <div className="flex items-end gap-4 flex-wrap">
           <div>
             <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>{t('Caméra & effets')}</h2>
-            <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4 }}>{t('Choisis un mouvement, choisis une photo : le clip arrive dans ta bibliothèque.')}</div>
+            <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4 }}>{photoVenue
+              ? t('Photo choisie : il reste à choisir un mouvement.')
+              : t('Choisis un mouvement, choisis une photo : le clip arrive dans ta bibliothèque.')}</div>
           </div>
           <span style={{ flex: 1 }} />
           <div className="wtabs">
@@ -48,14 +53,14 @@ export function PresetsView({ goVideo }: { goVideo: () => void }) {
           ))}
         </div>
       </div>
-      {ouvert && <Lancer p={ouvert} nom={nom(ouvert)} onClose={() => setOuvert(null)} goVideo={goVideo} />}
+      {ouvert && <Lancer p={ouvert} nom={nom(ouvert)} photoInitiale={photoVenue} onClose={() => setOuvert(null)} goVideo={goVideo} />}
     </div>
   )
 }
 
-function Lancer({ p, nom, onClose, goVideo }: { p: Preset; nom: string; onClose: () => void; goVideo: () => void }) {
+function Lancer({ p, nom, photoInitiale, onClose, goVideo }: { p: Preset; nom: string; photoInitiale: Asset | null; onClose: () => void; goVideo: () => void }) {
   const s = useAppStore()
-  const [photo, setPhoto] = useState<Asset | null>(null)
+  const [photo, setPhoto] = useState<Asset | null>(photoInitiale)
   const [detail, setDetail] = useState('')
   const [duree, setDuree] = useState(5)
   const [busy, setBusy] = useState(false)

@@ -188,7 +188,12 @@ interface AppState {
    *  section) — sans ça les réglages atterrissaient dans une console
    *  invisible. Le nonce force la prise en compte même si la cible ne
    *  change pas. Consommée par le shell (V2App). */
-  navRequest: { section: 'image' | 'video'; nonce: number } | null
+  navRequest: { section: 'image' | 'video' | 'presets' | 'parole' | 'reshoot'; nonce: number } | null
+  /** « Utiliser dans… » (30/10) : le média que la section cible reprend à son ouverture,
+   *  puis efface. Les sections gardent leur source en état local ; ce champ est le seul pont. */
+  passerelle: { cible: 'presets' | 'parole' | 'reshoot'; assetId: string } | null
+  utiliserDans: (cible: 'presets' | 'parole' | 'reshoot', asset: Asset) => void
+  prendrePasserelle: (cible: 'presets' | 'parole' | 'reshoot') => Asset | null
   setMode: (m: MediaMode) => void
   /** prompts séparés par mode : chaque section retrouve son texte (image XXX / vidéo YYY). */
   promptStash: Partial<Record<MediaMode, { text: string; touched: boolean }>>
@@ -498,6 +503,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => {
     initialBrief: null,
     promptVision: null,
     navRequest: null,
+    passerelle: null,
     requestId: null,
     userDirectives: '',
     composedPositive: '',
@@ -539,6 +545,15 @@ export const useAppStore = create<AppState>()(persist((set, get) => {
        demande de navigation que le clone. Le desktop passe déjà ses propres
        callbacks (goVideo/goImage) et ignore le champ — l'ajouter ne change
        rien pour lui ; le mobile, lui, n'a que ce canal. */
+    utiliserDans: (cible, asset) =>
+      set(st => ({ passerelle: { cible, assetId: asset.id }, navRequest: { section: cible, nonce: (st.navRequest?.nonce ?? 0) + 1 } })),
+    prendrePasserelle: cible => {
+      const p = get().passerelle
+      if (p?.cible !== cible) return null
+      set({ passerelle: null })
+      return get().assets.find(a => a.id === p.assetId) ?? null
+    },
+
     animateFrom: async asset => {
       if (asset.mediaType !== 'photo') return
       get().setMode('video')

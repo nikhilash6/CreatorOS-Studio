@@ -3,6 +3,7 @@
    Un seul process (`npm start`). Il n'écoute que sur la boucle locale
    par défaut (CREATOROS_HOST pour l'ouvrir).
    ============================================================ */
+import { etatAllegement } from './allege.js'
 import fs from 'node:fs'
 import crypto from 'node:crypto'
 import os from 'node:os'
@@ -224,6 +225,9 @@ app.post('/api/diagnostic/figer', async () => {
   await diagnostiquer({ recettes: recettesServies(), frais: true })
   return r
 })
+
+/* Machines modestes (30/10) : profil de VRAM et variantes allégées prêtes ou manquantes. */
+app.get('/api/machine/allegement', async () => etatAllegement())
 
 app.get('/api/health', async req => {
   let comfyState = 'inatteignable'; let vram = null
@@ -834,6 +838,7 @@ function inputEtranger(b, proprietaire) {
 app.post('/api/jobs', async (req, reply) => {
   const etranger = inputEtranger(req.body || {}, estProprietaire(req))
   if (etranger) { reply.code(400); return { error: `« ${path.basename(etranger)} » absent du dossier input/` } }
+  if (req.body && !estProprietaire(req)) delete req.body.profilVram   // profil de banc : propriétaire seulement
   try {
     const r = await deposerAvecCle(cleComfy(req), () => enqueueParPlans(req.body || {}))   // une vidéo de mouvement montée part en un job par plan
     /* 200 (et non 202) quand la clé d'idempotence avait déjà été vue : le

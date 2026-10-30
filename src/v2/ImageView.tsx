@@ -80,11 +80,28 @@ export function ImageView({ onOpen, goVideo }: { onOpen: (a: Asset, list: Asset[
     </span>
   </>)
 
-  const send = () => {
-    const st = s.photo.styleId ? (STYLES.find(x => x.id === s.photo.styleId) as { prompt?: string } | undefined) : null
-    if (st?.prompt && task === 'generate' && !s.userPrompt.includes(st.prompt))
-      s.setComposed(`${s.userPrompt.trim()}, ${st.prompt}`, '')
-    void s.submitJob()
+  const envoyerUn = async () => {
+    const e = useAppStore.getState()
+    const st = e.photo.styleId ? (STYLES.find(x => x.id === e.photo.styleId) as { prompt?: string } | undefined) : null
+    if (st?.prompt && task === 'generate' && !e.userPrompt.includes(st.prompt))
+      e.setComposed(`${e.userPrompt.trim()}, ${st.prompt}`, '')
+    await e.submitJob()
+  }
+  /* Plusieurs prompts (30/10, demandé sur Reddit) : une ligne = un prompt, chaque
+     ligne part avec les mêmes réglages (format, lot, graine, style). Le texte est
+     rendu tel quel au champ à la fin. Le serveur compte chaque image au quota. */
+  const [multi, setMulti] = useState(false)
+  const lignes = multi && task === 'generate' ? s.userPrompt.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 20) : []
+  const send = async () => {
+    if (lignes.length < 2) return void envoyerUn()
+    const garde = s.userPrompt
+    try {
+      for (const l of lignes) {
+        useAppStore.setState({ userPrompt: l, promptTouched: true, composedPositive: '' })
+        await envoyerUn()
+        if (useAppStore.getState().t0Error) break
+      }
+    } finally { useAppStore.setState({ userPrompt: garde }) }
   }
 
   return (
@@ -169,7 +186,7 @@ export function ImageView({ onOpen, goVideo }: { onOpen: (a: Asset, list: Asset[
           <textarea
             className="w-full bg-transparent outline-none resize-none text-[13px]"
             style={{ color: 'var(--text)', minHeight: 40, fieldSizing: 'content' } as React.CSSProperties}
-            placeholder={task === 'edit' ? t('Instruction de retouche — « la robe devient rouge »') : t('Décrire la scène…')}
+            placeholder={task === 'edit' ? t('Instruction de retouche — « la robe devient rouge »') : multi ? t('Un prompt par ligne : chaque ligne part avec les mêmes réglages') : t('Décrire la scène…')}
             value={s.userPrompt} onChange={e => s.setUserPrompt(e.target.value)} onKeyDown={briefs.onKeyDown} />
           {briefs.panel}
           <div className="flex gap-1.5 items-center mt-2 flex-wrap">
@@ -185,11 +202,14 @@ export function ImageView({ onOpen, goVideo }: { onOpen: (a: Asset, list: Asset[
             <button className="pill tool" onClick={() => setEnh(true)}>✦ {t('Enhancer')}</button>
             <button className="pill tool" onClick={() => setElm(true)}>@ {t('Éléments')}</button>
             <button className="pill tool" onClick={briefs.open} title={t('briefs récents et étoilés (↑ dans un champ vide)')}>↺ {t('Briefs')}</button>
+            {task === 'generate' && <button className={`pill tool${multi ? ' on' : ''}`} onClick={() => setMulti(m => !m)}
+              title={t('Un prompt par ligne, lancés l’un après l’autre')}>≡ {multi && lignes.length > 1 ? t('{n} prompts', { n: lignes.length }) : t('Plusieurs prompts')}</button>}
+            {s.userPrompt && <button className="pill tool" onClick={() => s.setUserPrompt('')} title={t('Vider le champ')}>✕</button>}
           </div>
           {s.t0Error && <div className="mt-1.5 text-[11px]" style={{ color: 'var(--danger)' }}>{s.t0Error}</div>}
         </div>
-        <button className="cta" style={isMobile ? { padding: '14px', flexDirection: 'row' } : { padding: '0 30px' }} onClick={send}>
-          {t('Générer')} <small>{tp(s.batchCount, '{n} job', '{n} jobs')} · ~{fmtDur(s.batchCount * photoEtaMs)}</small>
+        <button className="cta" style={isMobile ? { padding: '14px', flexDirection: 'row' } : { padding: '0 30px' }} onClick={() => void send()}>
+          {t('Générer')} <small>{tp(s.batchCount * Math.max(1, lignes.length), '{n} job', '{n} jobs')} · ~{fmtDur(s.batchCount * Math.max(1, lignes.length) * photoEtaMs)}</small>
         </button>
       </>)
       return isMobile ? <MobileSheet>{bar}</MobileSheet> : <div className="fbar">{bar}</div> })()}

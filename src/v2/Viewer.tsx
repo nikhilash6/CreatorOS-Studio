@@ -311,6 +311,15 @@ export function Viewer({ asset, list, onGo, onClose, goVideo, goImage }: {
                 onClick={() => void finition('interpolate')}>{t('≈ Fluidité 48 i/s')}</button>}
             </div>
           </>)}
+          {/* « Utiliser dans… » (30/10) : ce média ouvre une autre section, déjà choisi comme source */}
+          <div className="flex gap-1.5 items-center flex-wrap text-[10.5px]" style={{ color: 'var(--muted)' }}>
+            {t('Utiliser dans')}
+            {asset.mediaType === 'photo' && <>
+              <button className="pill" style={{ fontSize: 10.5, padding: '4px 9px' }} onClick={() => { s.utiliserDans('presets', asset); onClose() }}>{t('Caméra & effets')}</button>
+              <button className="pill" style={{ fontSize: 10.5, padding: '4px 9px' }} onClick={() => { s.utiliserDans('parole', asset); onClose() }}>{t('Avatar parlant')}</button>
+            </>}
+            {asset.mediaType === 'video' && <button className="pill" style={{ fontSize: 10.5, padding: '4px 9px' }} onClick={() => { s.utiliserDans('reshoot', asset); onClose() }}>{t('🎥 Re-shoot')}</button>}
+          </div>
           {finMsg && <div className="text-[10.5px]" style={{ color: finMsg.ok ? 'var(--positif)' : 'var(--danger)' }}>{finMsg.txt}</div>}
           {asset.mediaType === 'photo' && (<>
             <button className="b2" onClick={() => { void s.retouchFrom(asset); onClose(); goImage() }}>{t('✎ Éditer (retouche)')}</button>

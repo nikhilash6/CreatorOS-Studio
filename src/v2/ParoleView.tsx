@@ -23,6 +23,8 @@ export function ParoleView({ goVideo }: { goVideo: () => void }) {
   const [enreg, setEnreg] = useState<{ rec: MediaRecorder; t0: number } | null>(null)
   const [secondes, setSecondes] = useState(0)
   const morceaux = useRef<Blob[]>([])
+  // « Utiliser dans… » depuis la visionneuse : ce visage est déjà choisi
+  useEffect(() => { const a = useAppStore.getState().prendrePasserelle('parole'); if (a) setPhoto(a) }, [])
 
   const photos = useMemo(() => s.assets.filter(a => a.mediaType === 'photo' && a.reviewStatus !== 'rejected')
     .sort((x, y) => Number(y.reviewStatus === 'approved') - Number(x.reviewStatus === 'approved') || y.createdAt - x.createdAt).slice(0, 120), [s.assets])

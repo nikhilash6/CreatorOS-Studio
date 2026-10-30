@@ -12,12 +12,16 @@ interface Probleme { gravite: 'bloquant' | 'alerte'; domaine: string; quoi: stri
 interface Diag { quand: number; dureeMs: number; ok: boolean; bloquants: number; alertes: number; problemes: Probleme[]; infos: Record<string, string | number>
   liaison?: { etat: 'ok' | 'redemarre' | 'panne'; revenuLe: number | null; coupureMs: number | null; bilan: { quand: number; ok: boolean; bloquants: number; alertes: number } | null } }
 
+interface Allegement { profil: number; source: string; vramGo: number | null; variantes: { de: string; vers: string; pour: number; utile: boolean; installee: boolean }[] }
+const court = (f: string) => f.replace(/\.(safetensors|gguf)$/, '')
+
 export function VoyantMachine() {
   const [d, setD] = useState<Diag | null>(null)
   const [injoignable, setInjoignable] = useState(false)
   const [ouvert, setOuvert] = useState(false)
   const [enCours, setEnCours] = useState(false)
   const [copie, setCopie] = useState(false)
+  const [allege, setAllege] = useState<Allegement | null>(null)
   const boite = useRef<HTMLSpanElement>(null)
 
   const lire = useCallback(async (frais = false) => {
@@ -32,6 +36,11 @@ export function VoyantMachine() {
     const iv = setInterval(() => void lire(), 20_000)   // le serveur garde son contrôle 2 min : lecture légère
     return () => clearInterval(iv)
   }, [lire])
+  // petite carte : poids légers employés à la place des modèles lourds (lu à l'ouverture)
+  useEffect(() => {
+    if (!ouvert) return
+    fetch('/api/machine/allegement').then(r => r.ok ? r.json() : null).then(setAllege, () => setAllege(null))
+  }, [ouvert])
   // clic en dehors : on referme
   useEffect(() => {
     if (!ouvert) return
@@ -76,6 +85,15 @@ export function VoyantMachine() {
               {t('ComfyUI a redémarré à {h}', { h: new Date(revenu.revenuLe!).toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' }) })}
               {revenu.coupureMs ? t(' (coupure de {n} s)', { n: Math.round(revenu.coupureMs / 1000) }) : ''} — {t('bilan :')} {!revenu.bilan ? t('contrôle en cours…')
                 : revenu.bilan.bloquants || revenu.bilan.alertes ? t('{b} bloquant(s), {a} alerte(s)', { b: revenu.bilan.bloquants, a: revenu.bilan.alertes }) : t('rien à signaler')}
+            </div>
+          )}
+          {allege && allege.profil < 24 && (
+            <div className="text-[11.5px]" style={{ borderLeft: '3px solid var(--lv4)', padding: '5px 0 5px 10px', margin: '8px 0', color: 'var(--muted)' }}>
+              <div style={{ color: 'var(--text)' }}>{t('Profil {n} Go', { n: allege.profil })}{allege.vramGo ? t(' (carte de {n} Go)', { n: allege.vramGo }) : ''} — {t('poids légers à la place des modèles lourds, mêmes recettes')}</div>
+              {allege.variantes.filter(v => v.utile).map(v => (
+                <div key={v.vers}>{v.installee ? '✓' : '✗'} {court(v.de)} → {court(v.vers)}</div>
+              ))}
+              {allege.variantes.some(v => v.utile && !v.installee) && <div style={{ marginTop: 2 }}>→ {t('les installer : npm run setup -- --vram {n}', { n: allege.profil })}</div>}
             </div>
           )}
           {d?.problemes.map((p, i) => (

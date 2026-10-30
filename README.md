@@ -69,7 +69,7 @@ Ollama (local)         prompt rewriting, captions, light vision checks
 
 ## Requirements
 
-- An NVIDIA GPU. The production machine uses a 32 GB card; video recipes are sized for it.
+- An NVIDIA GPU. The production machine uses a 32 GB card and the full-size recipes are sized for it; on 12 and 16 GB cards the photo recipes run with lighter weights (see [Smaller GPUs](#smaller-gpus)).
 - Node.js 22.5 or newer (the server uses the built-in `node:sqlite`) and ffmpeg.
 - [ComfyUI](https://github.com/comfyanonymous/ComfyUI), recent enough to ship the Wan Animate 2, LTX-2.5 and SAM3 core nodes, plus these custom node packs:
   ComfyUI-KJNodes, ComfyUI-VideoHelperSuite, ComfyUI-GGUF, ComfyUI-CrossViewWarp (re-shoot), ComfyUI-WanVideoWrapper + ComfyUI-segment-anything-2 + comfyui_controlnet_aux + comfyui_segment_anything (Mix), ComfyUI-Frame-Interpolation (RIFE, for video refine and smoothing), RES4LYF, ComfyUI-Impact-Pack + Impact-Subpack (only for photo HD).
@@ -128,6 +128,14 @@ npm run setup -- --comfy ~/ComfyUI --groups photo,video_wan
 
 The model list lives in `scripts/installer/modeles.json` (target folder, URL, size, licence, recipes). The wizard re-reads `workflows/PROD_*.json` on every run and warns about any model a recipe loads that the manifest does not know. FLUX.2 Klein and LTX-2.5 come from gated Hugging Face repos: accept the licence on the model page, then `export HF_TOKEN=...` before running setup. The token is only sent as an `Authorization` header to huggingface.co, never printed or written. Restart ComfyUI after new node packs are installed.
 
+### Smaller GPUs
+
+The recipes stay the same on a smaller card; only the weights change. Below 24 GB, the studio swaps each heavy model loader for a lighter version of the same model just before the graph goes to ComfyUI: FLUX.2 Klein 4B instead of 9B, with its 4B text encoder. More variants (Wan 2.2 A14B as GGUF Q4) are going through the lab next. A variant is used only when its file is installed; otherwise the original runs and ComfyUI offloads it, more slowly. Krea 2 (13 GB) has no smaller version, so under 14 GB the default photo engine becomes FLUX.2 Klein. Character LoRAs trained on Klein 9B do not apply to the 4B, so on a 12 GB card a character keeps her look only through the prompt.
+
+The profile (24, 16, 12 or 8 GB) comes from the card ComfyUI reports, or from `CREATOROS_VRAM`. The setup wizard reads the same profile and downloads only the light files your card needs (`npm run setup -- --vram 12` to size it for another card, `--keep-full` to also keep the originals). The machine panel shows the profile and which light weights are installed. The variants live in `scripts/installer/modeles.json` (`leger` entries), one list for the wizard and the server.
+
+Only variants that passed the lab are listed. [docs/LAB.md](docs/LAB.md) gives the real render time and peak VRAM of each recipe, full-size on a 32 GB card and light on a ComfyUI limited to about 12 GB.
+
 ### Configuration
 
 All settings are environment variables. The main ones:
@@ -174,6 +182,26 @@ Internet visitors (anyone without the key and outside the tailnet) are limited t
 Visitors can only start from images the studio generated itself. Uploading photos, videos, voices or music is owner-only, and the server refuses any job that points at an uploaded file, even when the request is crafted by hand. Every text a visitor sends is checked raw, before the LLM rewrites it, and again after rewriting. Anything that refers to a child or a minor age is refused (English and French, ages in digits or words, disguised spellings), along with sexual content. A visitor refused for this is blocked from rendering for the rest of the day, and the owner is notified.
 
 ComfyUI's `input/` folder may be shared with another install on the same machine. The studio keeps a register of the files it put there itself: the source picker only lists those, and a job or an image description that names any other file is refused. No JSON response shows the server's home folder; it is replaced by `~`.
+
+### Use it from a terminal or an AI agent
+
+The studio has a command line and an MCP server. Both talk to a running studio over its HTTP API, so the same rules apply as in the web UI: content filter, render queue, visitor limits.
+
+```bash
+npm run studio -- photo "a woman reading by a sunny library window, candid" --wait --out ./renders
+npm run studio -- video <libraryId> "she turns a page, slow push-in" --wait
+npm run studio -- reel "Sunday morning at a flower market" --shots 4 --wait --out ./renders
+npm run studio -- status <jobId|reelId>
+npm run studio -- library --n 5 --json
+```
+
+`--json` prints one JSON object per result, for scripts and agents. To let Claude Code, Claude Desktop, Cursor or any MCP client drive the studio:
+
+```bash
+claude mcp add creatoros-studio -- node /path/to/creatoros-studio/scripts/agent/mcp.mjs
+```
+
+The MCP server exposes `generate_photo`, `image_to_video`, `make_reel`, `get_status`, `list_library`, `list_characters` and `machine_status`. It has no dependency beyond Node. Set `STUDIO_URL` if the studio is not on `http://127.0.0.1:8787`, and `CREATOROS_OWNER_KEY` if it is locked with an owner key. Without the key, a request from the same machine is treated like any visitor.
 
 ## Community
 

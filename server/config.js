@@ -5,11 +5,24 @@
    ============================================================ */
 import os from 'node:os'
 import path from 'node:path'
+import { execFileSync } from 'node:child_process'
 
 const home = os.homedir()
 const repo = path.resolve(import.meta.dirname, '..')
 const comfyDir = process.env.COMFY_DIR || path.join(home, 'ComfyUI')
 const dataDir = process.env.CREATOROS_DATA || path.join(home, 'creatoros-data')
+
+/** VRAM de la première carte NVIDIA de cette machine, en Go (0 si inconnue). Lue une fois. */
+let vramLue
+function vramLocaleGo() {
+  if (vramLue === undefined) {
+    try {
+      const mo = execFileSync('nvidia-smi', ['--query-gpu=memory.total', '--format=csv,noheader,nounits'], { timeout: 3000, encoding: 'utf8' })
+      vramLue = Math.round(Number(mo.split('\n')[0]) / 1024) || 0
+    } catch { vramLue = 0 }
+  }
+  return vramLue
+}
 
 export const CONFIG = {
   /* Serveur HTTP — boucle locale par défaut. Pour l'ouvrir au réseau, poser
@@ -55,7 +68,9 @@ export const CONFIG = {
      Un job peut demander l'autre (job.photoEngine). Une seule source : le
      réécriveur, le carrousel et les recettes lisent tous cette valeur. */
   photoEngine: ['krea', 'klein'].includes((process.env.CREATOROS_PHOTO_ENGINE || '').trim().toLowerCase())
-    ? process.env.CREATOROS_PHOTO_ENGINE.trim().toLowerCase() : 'krea',
+    ? process.env.CREATOROS_PHOTO_ENGINE.trim().toLowerCase()
+    // Krea 2 pèse 13 Go : sous 14 Go de VRAM, Klein (allégé en 4B, cf. allege.js) le remplace
+    : vramLocaleGo() && vramLocaleGo() < 14 || [8, 12].includes(Number(process.env.CREATOROS_VRAM)) ? 'klein' : 'krea',
 
   /* Données persistantes — HORS du dépôt git : ni images ni base n'ont à
      s'y trouver. */
