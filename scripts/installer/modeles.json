@@ -1219,6 +1219,18 @@
       "recettes": [],
       "gated": true,
       "verifie": true
+    },
+    {
+      "chemin": "qwen/qwen-image-edit-2511-multiple-angles-lora.safetensors",
+      "dossier": "loras",
+      "url": "https://huggingface.co/fal/Qwen-Image-Edit-2511-Multiple-Angles-LoRA/resolve/main/qwen-image-edit-2511-multiple-angles-lora.safetensors",
+      "taille": 295140688,
+      "licence": "Apache-2.0",
+      "groupes": [
+        "retouche"
+      ],
+      "recettes": [],
+      "verifie": true
     }
   ],
   "_exclus": [

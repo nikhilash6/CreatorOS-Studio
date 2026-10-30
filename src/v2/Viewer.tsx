@@ -134,6 +134,20 @@ function CaptionCard({ asset }: { asset: Asset }) {
   )
 }
 
+/** Angles (30/10) : la même photo vue d'une autre position de caméra — Qwen-Image-Edit 2511 avec la LoRA
+ *  Multiple-Angles de fal (Apache-2.0, 96 poses apprises sur des rendus Gaussian Splatting). */
+const LORA_ANGLES = 'qwen/qwen-image-edit-2511-multiple-angles-lora.safetensors'
+const ANGLES = [
+  { id: 'g34', label: '¾ gauche', vue: 'front-left quarter view eye-level shot medium shot' },
+  { id: 'd34', label: '¾ droite', vue: 'front-right quarter view eye-level shot medium shot' },
+  { id: 'profil', label: 'Profil', vue: 'right side view eye-level shot medium shot' },
+  { id: 'dos', label: 'De dos', vue: 'back view eye-level shot medium shot' },
+  { id: 'plongee', label: 'Plongée', vue: 'front view high-angle shot medium shot' },
+  { id: 'contre', label: 'Contre-plongée', vue: 'front view low-angle shot medium shot' },
+  { id: 'large', label: 'Plan large', vue: 'front view eye-level shot wide shot' },
+  { id: 'serre', label: 'Gros plan', vue: 'front view eye-level shot close-up' },
+]
+
 /** Looks en un clic : des consignes de retouche prêtes (Qwen-Image-Edit 2511), personnage et cadrage gardés. */
 const LOOKS = [
   { id: 'or', label: 'Heure dorée', consigne: 'Relight the photo to warm golden hour sunlight with long soft shadows. Keep the person, pose, outfit and framing unchanged.' },
@@ -215,6 +229,11 @@ export function Viewer({ asset, list, onGo, onClose, goVideo, goImage }: {
     useAppStore.setState({ promptTouched: true, composedPositive: '' })
     await s.submitJob()
     onClose(); goImage()
+  }
+  const lancerAngle = async (vue: string) => {
+    const avant = useAppStore.getState().loraPicks
+    useAppStore.setState({ loraPicks: [{ name: LORA_ANGLES, strength: 1, trigger: '' }] })
+    try { await lancerLook(`<sks> ${vue}`) } finally { useAppStore.setState({ loraPicks: avant }) }
   }
   const telechargerGraphe = async () => {
     const r = await fetch(`/api/assets/${encodeURIComponent(asset.id)}/workflow`)
@@ -365,6 +384,13 @@ export function Viewer({ asset, list, onGo, onClose, goVideo, goImage }: {
               {LOOKS.map(l => (
                 <button key={l.id} className="pill" style={{ fontSize: 10.5, padding: '4px 9px' }} title={l.consigne}
                   onClick={() => void lancerLook(l.consigne)}>{t(l.label)}</button>
+              ))}
+            </div>
+            <div className="flex gap-1.5 items-center flex-wrap text-[10.5px]" style={{ color: 'var(--muted)' }}>
+              {t('Angle')}
+              {ANGLES.map(l => (
+                <button key={l.id} className="pill" style={{ fontSize: 10.5, padding: '4px 9px' }} title={t('la même photo, vue d’une autre position de caméra')}
+                  onClick={() => void lancerAngle(l.vue)}>{t(l.label)}</button>
               ))}
             </div>
           </>
