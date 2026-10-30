@@ -6,6 +6,7 @@
    ============================================================ */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { t, tp, getLang } from '../i18n'
+import { journalBug } from '../lib/journalBug'
 
 interface Probleme { gravite: 'bloquant' | 'alerte'; domaine: string; quoi: string; conseil: string }
 interface Diag { quand: number; dureeMs: number; ok: boolean; bloquants: number; alertes: number; problemes: Probleme[]; infos: Record<string, string | number>
@@ -16,6 +17,7 @@ export function VoyantMachine() {
   const [injoignable, setInjoignable] = useState(false)
   const [ouvert, setOuvert] = useState(false)
   const [enCours, setEnCours] = useState(false)
+  const [copie, setCopie] = useState(false)
   const boite = useRef<HTMLSpanElement>(null)
 
   const lire = useCallback(async (frais = false) => {
@@ -61,7 +63,11 @@ export function VoyantMachine() {
           background: 'var(--lv2)', border: '1px solid var(--lv4)', borderRadius: 12, padding: 14, boxShadow: '0 12px 40px #0009', color: 'var(--text)' }}>
           <div className="flex items-center gap-2 mb-2">
             <b className="text-[13px]">{t('Machine de rendu — {x}', { x: titre })}</b>
-            <button className="pill ml-auto" style={{ fontSize: 10.5, padding: '4px 10px' }} disabled={enCours} onClick={() => void relancer()}>
+            <button className="pill ml-auto" style={{ fontSize: 10.5, padding: '4px 10px' }} title={t('Copie un journal sans données privées, à coller dans une issue GitHub')}
+              onClick={() => void journalBug().then(x => navigator.clipboard?.writeText(x)).then(() => setCopie(true), () => setCopie(false))}>
+              {copie ? t('✓ copié') : t('📋 journal pour un bug')}
+            </button>
+            <button className="pill" style={{ fontSize: 10.5, padding: '4px 10px' }} disabled={enCours} onClick={() => void relancer()}>
               {enCours ? t('contrôle…') : t('↻ recontrôler')}
             </button>
           </div>

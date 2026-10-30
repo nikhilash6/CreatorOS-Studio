@@ -143,6 +143,8 @@ const assetOut = r => r && ({
   // Durée du rendu du job (ms). 0 = inconnue (repris sans date de départ) :
   // le front n'affiche rien plutôt qu'un « 0 s » faux.
   renderMs: r.render_ms ?? undefined,
+  // contrôle automatique du clip (défauts horodatés, score de visage), cf. server/controle.js
+  controle: r.controle ? (() => { try { return JSON.parse(r.controle) } catch { return undefined } })() : undefined,
   /* Provenance jointe (cf. db.ASSET_SELECT) : c'est ce qui rend un asset
      rechargé depuis la base clonable côté front. Le workflow injecté n'est
      PAS ici — trop lourd ; il vit sur /api/assets/:id/provenance. */
@@ -182,6 +184,25 @@ const personaPublique = (id) => {
 
 /* Diagnostic de la machine : GET rend le dernier (ou en lance un s'il a plus
    de 2 min) ; ?frais=1 force un contrôle complet (~4 s). Lecture seule. */
+/* Journal pour un rapport de bug (27/10) : ce qu'un utilisateur colle dans une issue
+   GitHub. Rien de privé : les chemins absolus sont masqués, aucune clé, aucun prompt. */
+const VERSION_STUDIO = (() => {
+  let v = '0'
+  try { v = JSON.parse(fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'package.json'), 'utf8')).version } catch { /* sans package.json */ }
+  try { v += '+' + execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: path.dirname(new URL(import.meta.url).pathname), stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim() } catch { /* hors dépôt git */ }
+  return v
+})()
+const sansChemins = x => String(x ?? '').replace(/(?:\/[\w.@+-]+){2,}\/?/g, '<chemin>').replace(/[A-Z]:\\[^\s"']+/g, '<chemin>').slice(0, 300)
+app.get('/api/journal-bug', async () => {
+  const d = await diagnostiquer({ recettes: recettesServies(), frais: false }).catch(() => null)
+  const echecs = store.listJobs(80).filter(j => j.status === 'blocked' && !/annulé par/i.test(j.error ?? '')).slice(0, 10)
+  return {
+    studio: VERSION_STUDIO, node: process.version, systeme: `${os.platform()} ${os.release()}`, file: queueDepth(),
+    comfyui: comfy.etatLiaison()?.etat ?? 'inconnu',
+    diagnostic: d ? { bloquants: d.bloquants, alertes: d.alertes, problemes: d.problemes.map(p => `${p.gravite} · ${p.domaine} — ${sansChemins(p.quoi)}`) } : null,
+    echecsRecents: echecs.map(j => ({ job: j.id, quand: new Date(j.created_at).toISOString(), mode: j.mode, recette: j.recipe_id, erreur: sansChemins(j.error) })),
+  }
+})
 app.get('/api/diagnostic', async (req) => ({
   ...await diagnostiquer({ recettes: recettesServies(), frais: req.query?.frais === '1' }),
   liaison: { ...comfy.etatLiaison(), bilan: bilanRetour },
@@ -1829,14 +1850,28 @@ app.post('/api/assets/:id/edit-video', async (req, reply) => {
   if (!a || a.media_type !== 'video') { reply.code(404); return { error: 'vidéo inconnue' } }
   const src = path.join(CONFIG.mediaDir, path.basename(a.filename ?? a.uri))
   if (!fs.existsSync(src)) { reply.code(404); return { error: 'fichier vidéo introuvable' } }
-  const prompt = String(req.body?.prompt ?? '').trim(), cible = String(req.body?.cible ?? '').trim()
+  /* Trois façons (27/10) : modifier un élément, le retirer, ou changer le fond autour de la personne. */
+  const mode = ['retirer', 'fond'].includes(req.body?.mode) ? req.body.mode : 'modifier'
+  let prompt = String(req.body?.prompt ?? '').trim(), cible = String(req.body?.cible ?? '').trim()
+  let strength = Number(req.body?.strength)
+  if (mode === 'fond') cible = cible || 'person'
   if (!cible) { reply.code(400); return { error: 'dis quel élément modifier (ex. « dress »)' } }
-  if (!prompt) { reply.code(400); return { error: 'décris ce que cet élément doit devenir' } }
+  if (mode === 'retirer') {
+    // l'élément disparaît : on redessine sa zone en décor, plus fort qu'une simple modification
+    // ne pas nommer l'objet ici : l'encodeur de texte ignore la négation, « without a cup » attire une tasse
+    // (l'objet est mis dans le prompt négatif par runInpaintVideo)
+    prompt = `empty surface, the background continues naturally, nothing there, same lighting and colours${prompt ? `, ${prompt}` : ''}`
+    if (!Number.isFinite(strength)) strength = 1
+  } else if (mode === 'fond') {
+    if (!prompt) { reply.code(400); return { error: 'décris le nouveau décor' } }
+    prompt = `${prompt}, natural lighting consistent with the person in the foreground`
+    if (!Number.isFinite(strength)) strength = 0.9
+  } else if (!prompt) { reply.code(400); return { error: 'décris ce que cet élément doit devenir' } }
   const inputName = `EDV_${Date.now().toString(36)}${path.extname(src) || '.mp4'}`
   fs.copyFileSync(src, path.join(CONFIG.comfyInput, inputName))
   try {
     const { id } = deposerAvecCle(cleComfy(req), () => enqueueInpaintVideo({ sourceFile: inputName, maskFile: null, parentAssetId: a.id,
-      prompt, cible, strength: Number(req.body?.strength) }))
+      prompt, cible, strength, inverser: mode === 'fond', retirer: mode === 'retirer' }))
     return { jobId: id }
   } catch (e) { reply.code(400); return { error: String(e.message || e) } }
 })

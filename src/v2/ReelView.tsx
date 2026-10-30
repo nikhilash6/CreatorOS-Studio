@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react'
 import { useAppStore } from '../store/useAppStore'
 import { getLang, t, tServeur } from '../i18n'
 
-interface PlanReel { still: string; motion: string; clipJob?: string | null; photoUri: string | null; clipUri: string | null; photoEtat: string | null; clipEtat: string | null; supprime?: boolean }
+interface PlanReel { still: string; motion: string; avertissements?: string[]; clipJob?: string | null; photoUri: string | null; clipUri: string | null; photoEtat: string | null; clipEtat: string | null; supprime?: boolean }
 interface Reel {
   id: string; brief: string; etat: 'redaction' | 'photos' | 'clips' | 'export' | 'fini' | 'echec'
   n: number; accroche?: string; plans: PlanReel[]; montageId?: string; reelUri: string | null; erreur?: string | null; createdAt: number
@@ -128,6 +128,9 @@ function CarteReel({ r, goMontage, onRetirer }: { r: Reel; goMontage: (id: strin
                 : <div className="flex items-center justify-center" style={{ height: '100%', fontSize: 10, color: 'var(--faint)' }}>{t('plan {n}', { n: i + 1 })}</div>}
               {p && !p.clipUri && (p.photoEtat === 'rendering' || p.clipEtat === 'rendering' || p.clipEtat === 'queued-comfy') &&
                 <span style={{ position: 'absolute', left: 4, bottom: 4, fontSize: 9, padding: '1px 5px', borderRadius: 5, background: 'rgba(0,0,0,.7)' }}>{p.clipJob ? t('anime…') : t('photo…')}</span>}
+              {/* contrôle du plan avant le rendu : ce que la réécriture n'a pas su corriger */}
+              {p?.avertissements?.length ? <span title={p.avertissements.map(x => t(x)).join(' · ')}
+                style={{ position: 'absolute', right: 4, top: 4, fontSize: 10, padding: '1px 5px', borderRadius: 5, background: 'rgba(255,182,72,.9)', color: '#111' }}>⚠</span> : null}
             </div>
           ))}
         </div>

@@ -47,6 +47,10 @@
     },
     "mix": {
       "label": "Video: Replay → Mix (WanAnimate 2.2 replacement: your character takes the place of the person in a video)"
+    },
+    "controle": {
+      "label": "Automatic clip check: face match (OpenCV YuNet + SFace, ~39 MB, CPU)",
+      "defaut": true
     }
   },
   "noeuds": [
@@ -1139,6 +1143,30 @@
       "recettes": [
         "PROD_wananimate_mix.json"
       ],
+      "verifie": true
+    },
+    {
+      "chemin": "face_detection_yunet_2023mar.onnx",
+      "dossier": "opencv",
+      "url": "https://huggingface.co/opencv/face_detection_yunet/resolve/main/face_detection_yunet_2023mar.onnx",
+      "taille": 232589,
+      "licence": "Apache-2.0",
+      "groupes": [
+        "controle"
+      ],
+      "recettes": [],
+      "verifie": true
+    },
+    {
+      "chemin": "face_recognition_sface_2021dec.onnx",
+      "dossier": "opencv",
+      "url": "https://huggingface.co/opencv/face_recognition_sface/resolve/main/face_recognition_sface_2021dec.onnx",
+      "taille": 38696353,
+      "licence": "Apache-2.0",
+      "groupes": [
+        "controle"
+      ],
+      "recettes": [],
       "verifie": true
     }
   ],

@@ -2,6 +2,7 @@
    Visionneuse mobile — média plein écran, actions de tri,
    reprise (cloner / animer / prolonger / HD) et informations.
    ============================================================ */
+import { resumeControle } from '../lib/controle'
 import { useEffect, useRef, useState } from 'react'
 import type { LoraLigne } from '../v2/Viewer'
 import { createPortal } from 'react-dom'
@@ -206,6 +207,7 @@ export function MViewer({ asset, list, onGo, onClose, folders, onFoldersChanged,
           <Info k={t('Format')} v={fresh.aspect + (fresh.videoDraft ? t(' · brouillon') : '')} />
           <Info k={t('Dimensions')} v={fresh.width && fresh.height ? `${fresh.width} × ${fresh.height}` : '—'} />
           {isVid && <Info k={t('Moteur')} v={fresh.videoEngine ?? '—'} />}
+          {isVid && <Info k={t('Contrôle')} wrap v={resumeControle(fresh.controle) ?? t('en cours ou indisponible')} />}
           <Info k={t('Seed')} copy v={p?.seed?.value != null
             ? `${p.seed.value} · ${(p.selections as { seed?: { mode?: string } } | undefined)?.seed?.mode === 'lock' ? t('fixe') : t('aléatoire')}`
             : t('aléatoire')} />

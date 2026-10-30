@@ -13,6 +13,7 @@ import { posterOf, vignetteOf } from '../components/AssetMedia'
 import { renderTime } from '../lib/renderTime'
 import { CorbeilleButton } from '../components/Corbeille'
 import { FOLDER_SORTS, trierDossiers } from '../lib/folders'
+import { defautsDe } from '../lib/controle'
 import { t, tp, tServeur } from '../i18n'
 import { Comparer } from '../components/Comparer'
 
@@ -445,6 +446,7 @@ export function AssetCard({ a, onOpen, picking, picked, onPick, extra }: {
             <span className="hovmeta">
               {renderTime(a.renderMs) ? t('rendu {x}', { x: renderTime(a.renderMs) ?? '' }) : ''}
               {clipS ? `${renderTime(a.renderMs) ? ' · ' : ''}clip ${clipS >= 9.5 ? Math.round(clipS) : clipS.toFixed(1)} s` : ''}
+              {defautsDe(a.controle).length ? ` · ${defautsDe(a.controle).join(', ')}` : ''}
             </span>
           )}
           <div className="acts">

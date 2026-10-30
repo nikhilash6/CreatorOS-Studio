@@ -518,6 +518,18 @@ export interface Asset {
   /** Durée du rendu du job en ms (jobs.duration_ms). 0 ou absent = inconnue
    *  (job repris sans date de départ en base). */
   renderMs?: number
+  /** Contrôle automatique du clip (server/controle.js) : défauts horodatés, score de visage, prise. */
+  controle?: Controle
+}
+
+export interface Controle {
+  duree?: number
+  problemes: { type: string; debut: number; fin: number; detail: string; grave: boolean }[]
+  visage?: { score: number | null; min?: number; mesures?: number; detail?: string } | null
+  prise?: number
+  priseDe?: string
+  relance?: string | boolean
+  choix?: 'gardée' | 'écartée'
 }
 
 /** Axe de variation d'un lot photo : la seed (même scène, N tirages) ou un

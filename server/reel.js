@@ -91,6 +91,48 @@ function geste(motion) {
   return gardees.length && gardees.join(' ').split(/\s+/).length >= 8 ? gardees.join(' ') : GESTE_SUR
 }
 
+/* ---------- contrôle des plans avant le rendu (27/10) ----------
+   Des règles écrites dans le code, pas un modèle qui juge : ce qui donne en pratique un
+   clip raté. Un plan fautif est réécrit UNE fois par le réalisateur ; ce qui reste
+   fautif part quand même, avec un avertissement sur sa carte. */
+const CONTROLES_PLAN = [
+  { code: 'enchaine', test: pl => /\b(then|and then|before|after that|afterwards|finally|while also)\b/i.test(pl.motion),
+    dit: 'several actions chained in one shot: keep ONE gesture', fr: 'plusieurs actions dans un seul plan' },
+  { code: 'marche', test: pl => /\b(walk|walks|walking|stroll|strolls|strolling|steps?|stepping)\b/i.test(pl.motion)
+      && !/\b(toward|towards|away from|left to right|right to left|from left|from right|to the left|to the right|forward|past the camera|closer)\b/i.test(pl.motion),
+    dit: 'walking with no direction relative to the camera: say toward the camera, away, or left to right', fr: 'marche sans direction (risque de marche à reculons)' },
+  { code: 'texte', test: pl => /\b(sign|signs|signboard|text|written|writing|lettering|letters|logo|neon sign|banner|poster|caption|label|menu board)\b/i.test(`${pl.still} ${pl.motion}`),
+    dit: 'text, signs or lettering in the frame: the model draws them as gibberish, remove them', fr: 'texte ou panneau dans l’image' },
+  { code: 'autrui', test: pl => /\b(another (person|woman|man)|a friend|her friend|boyfriend|girlfriend|partner|a stranger|someone|a man|the man|a waiter|people (come|walk|pass))\b/i.test(pl.motion),
+    dit: 'another person acting in the shot: keep her alone in the action', fr: 'une autre personne agit dans le plan' },
+  { code: 'long', test: pl => pl.motion.split(/\s+/).length > 32,
+    dit: 'motion too long: 12 to 25 words', fr: 'mouvement trop long' },
+]
+export function controlerPlan(pl) { return CONTROLES_PLAN.filter(c => c.test(pl)) }
+
+async function reecrirePlans(plans, fautifs, nom) {
+  const liste = fautifs.map(({ k, pb }) => `Shot ${k + 1}\nstill: ${plans[k].still}\nmotion: ${plans[k].motion}\nproblems: ${pb.map(c => c.dit).join('; ')}`).join('\n\n')
+  const res = await fetchOllama(`${CONFIG.ollamaUrl}/api/generate`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    signal: AbortSignal.timeout(Math.max(CONFIG.composerTimeoutMs, 300000)),
+    body: JSON.stringify({ model: composer.modelFor(), stream: false, think: false, keep_alive: '10m',
+      system: `You fix shots of a short reel with one woman named ${nom}. Rewrite ONLY what the listed problems require, keep everything else (framing, place, mood). Same length limits: still 30 to 55 words, motion 12 to 25 words with ONE gesture and ONE camera move. Safe for work.`,
+      prompt: liste,
+      format: { type: 'object', required: ['shots'], properties: { shots: { type: 'array', items: { type: 'object', required: ['shot', 'still', 'motion'],
+        properties: { shot: { type: 'integer' }, still: { type: 'string' }, motion: { type: 'string' } } } } } },
+      options: { num_gpu: 0, num_ctx: 8192, num_predict: 1500, temperature: 0.4 } }),
+  })
+  if (!res.ok) return
+  const out = JSON.parse(String((await res.json()).response || '{}'))
+  for (const s of out.shots ?? []) {
+    const k = Number(s.shot) - 1
+    if (!fautifs.some(f => f.k === k) || !s.still || !s.motion) continue
+    const neuf = { ...plans[k], still: String(s.still).trim(), motion: geste(s.motion) }
+    if (t0Hit(`${neuf.still} ${neuf.motion}`)) continue     // une réécriture ne passe jamais le filtre de contenu
+    plans[k] = neuf
+  }
+}
+
 /* ---------- lancement ---------- */
 export function realiser({ brief, n, duree, musique, langue, cle }) {
   const b = String(brief ?? '').trim().slice(0, 600)
@@ -117,7 +159,18 @@ export function realiser({ brief, n, duree, musique, langue, cle }) {
       const sujet = new RegExp(`^(?:${nom.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|She)\\s+(?:wears|is wearing)\\s+`, 'i')
       const bas = x => String(x ?? '').trim().replace(sujet, '').replace(/^(A|An|The)\b/, m => m.toLowerCase()).replace(/[.\s]+$/, '')
       const tronc = `She wears ${bas(r.outfit)}. ${String(r.location).trim().replace(/[.\s]+$/, '')}. ${String(r.light).trim().replace(/[.\s]+$/, '')}.`
-      const plans = r.shots.slice(0, data.n).map(s => ({ still: `${s.still.trim()} ${tronc}`, motion: geste(s.motion), photoJob: null, clipJob: null }))
+      const plans = r.shots.slice(0, data.n).map(s => ({ still: s.still.trim(), motion: geste(s.motion), photoJob: null, clipJob: null }))
+      // contrôle avant le rendu : une réécriture des plans fautifs, puis avertissement pour ce qui reste
+      const fautifs = plans.map((pl, k) => ({ k, pb: controlerPlan(pl) })).filter(f => f.pb.length)
+      if (fautifs.length) {
+        console.log(`[reel ${id}] contrôle des plans : ${fautifs.map(f => `plan ${f.k + 1} (${f.pb.map(c => c.code).join(', ')})`).join(' ; ')} → réécriture`)
+        try { await reecrirePlans(plans, fautifs, nom) } catch (e) { console.warn(`[reel ${id}] réécriture impossible — ${e.message || e}`) }
+      }
+      for (const pl of plans) {
+        const reste = controlerPlan(pl)
+        if (reste.length) pl.avertissements = reste.map(c => c.fr)
+        pl.still = `${pl.still} ${tronc}`
+      }
       for (const pl of plans) {
         if (t0Hit(`${pl.still} ${pl.motion}`)) throw new Error('un plan rédigé contient un terme bloqué (liste T0) — relancer')
       }

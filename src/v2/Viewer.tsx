@@ -9,6 +9,7 @@ import { useAppStore } from '../store/useAppStore'
 import { useAssetNav } from '../components/useAssetNav'
 import { AssetNavArrows } from '../components/AssetNavArrows'
 import { renderTime } from '../lib/renderTime'
+import { resumeControle } from '../lib/controle'
 import { trierDossiers } from '../lib/folders'
 import { FolderMenu, Ic, lancerFinition, useConfirm, useExclusiveMenu } from './bits'
 import { createPortal } from 'react-dom'
@@ -264,6 +265,7 @@ export function Viewer({ asset, list, onGo, onClose, goVideo, goImage }: {
                 return clip ? `${clip.dur >= 9.5 ? Math.round(clip.dur) : clip.dur.toFixed(1)} s${fps ? ` · ${fps} fps` : ''}` : '…'
               })()],
               ['Moteur', asset.videoEngine ?? '—'],
+              ['Contrôle', resumeControle(asset.controle) ?? t('en cours ou indisponible')],
             ] as const : []),
             ['Rendu', renderTime(asset.renderMs) || '—'],
             ['Job', `#${asset.jobId}`, asset.jobId],

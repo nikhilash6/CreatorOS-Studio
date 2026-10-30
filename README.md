@@ -26,10 +26,11 @@ CreatorOS Studio is the public, general-audience edition of a production tool us
 - **Motion transfer**: animate a still with the movement of a driver video (Wan Animate 2).
 - **Mix (character swap)**: give it a video, and your active character takes the place of the person in it, in the same setting and with the same moves. The studio picks the sharpest early frame, reads the outfit with the vision model, renders your character full-body in that outfit, then WanAnimate 2.2 does the replacement (SAM2 mask placed by GroundingDINO) with the character's Wan identity LoRA.
 - **Shot-by-shot rendering**: a driver video that contains cuts is split automatically at each cut. Every shot is rendered on its own, then the montage is rebuilt at the exact original durations. Rendering a multi-shot source in one block freezes the first shot's state; rendering per shot follows the source.
-- **Brush retouch, photo and video**: paint a zone and describe the change. Only that zone is regenerated, and the rest stays byte-identical on photos. On video, the zone is either tracked frame to frame by SAM3 or kept fixed in the frame. The result opens in a before/after slider.
+- **Brush retouch, photo and video**: paint a zone and describe the change. Only that zone is regenerated, and the rest stays byte-identical on photos. On video, the zone is either tracked frame to frame by SAM3 or kept fixed in the frame. The result opens in a before/after slider. No brush needed on video either: name an element ("dress") and say what it becomes, or **change the background**: SAM3 finds and tracks the person, and everything around them is redrawn from your description while their motion stays untouched.
+- **Automatic clip check**: after every video render, the studio measures the clip in about a second, on the CPU: black frames, frozen video, a jump inside the shot, smear, and how close the face stays to the start image (OpenCV YuNet + SFace). A serious defect (black, frozen, jump, long smear) re-shoots the clip once with another seed. Both takes stay in the library, the one with fewer defects stays in front and the other is greyed out. Face drift and short blur are shown as warnings with the exact second.
 - **Live preview** of the latent while a render is running (desktop and mobile).
 - **Library**: review (approve/reject), folders, trash with restore, provenance of every render (recipe, seed, LoRAs, final prompt), and thumbnails for every grid.
-- **Diagnostics**: GPU/VRAM state, ComfyUI link watchdog, missing nodes and models per recipe.
+- **Diagnostics**: GPU/VRAM state, ComfyUI link watchdog, missing nodes and models per recipe, and a one-click **bug report log** (version, system, recent failures, browser errors, no private data) to paste into a GitHub issue.
 
 Desktop UI (`src/v2`) and a mobile UI (`src/m`) are served by the same backend; the mobile Studio space carries the reel, camera & effects, talking avatar and editor views. The interface is in French and English.
 
@@ -113,7 +114,7 @@ ComfyUI is expected at `http://127.0.0.1:8188` and Ollama at `http://127.0.0.1:1
 
 1. **Prerequisites**: Node 22.5+, git, ffmpeg, Python 3.12 (uv if present), NVIDIA driver and VRAM, with a fix hint for each missing piece.
 2. **ComfyUI**: found through `COMFY_DIR`, `~/ComfyUI` or a path you give. If absent, it can clone it, create a venv (uv or `python -m venv`), install a CUDA build of PyTorch matching your driver, then the requirements. It checks that ComfyUI is recent enough for the core nodes the recipes use.
-3. **Features**: pick what you want to run (photo, Klein, photo HD, edit, Wan, Wan T2V, LTX, motion, video retouch). Each group shows what is missing and its size.
+3. **Features**: pick what you want to run (photo, Klein, photo HD, edit, Wan, Wan T2V, LTX, motion, video retouch). Each group shows what is missing, its size, and an estimate of the VRAM it needs against your card (fits, tight, or likely too big).
 4. **Custom node packs** the selected groups need, cloned into `custom_nodes/` with their requirements installed into ComfyUI's venv (torch lines are skipped so your CUDA build stays).
 5. **Models**: downloaded into `models/` (or the default folder of your `extra_model_paths.yaml`), with progress and resume. Files are written as `.part` and renamed when complete.
 6. **Ollama**: checks the service and offers `ollama pull` for `CREATOROS_LLM` and `CREATOROS_VLM_DESCRIBE`.
@@ -173,6 +174,25 @@ Internet visitors (anyone without the key and outside the tailnet) are limited t
 Visitors can only start from images the studio generated itself. Uploading photos, videos, voices or music is owner-only, and the server refuses any job that points at an uploaded file, even when the request is crafted by hand. Every text a visitor sends is checked raw, before the LLM rewrites it, and again after rewriting. Anything that refers to a child or a minor age is refused (English and French, ages in digits or words, disguised spellings), along with sexual content. A visitor refused for this is blocked from rendering for the rest of the day, and the owner is notified.
 
 ComfyUI's `input/` folder may be shared with another install on the same machine. The studio keeps a register of the files it put there itself: the source picker only lists those, and a job or an image description that names any other file is refused. No JSON response shows the server's home folder; it is replaced by `~`.
+
+## Community
+
+Shared on Reddit the week of the submission (numbers as of 28 October 2026):
+
+| Community | Views | Upvotes | Comments | Shares |
+|---|---|---|---|---|
+| r/comfyui | 34,000 | 98 | 27 | 45 |
+| r/StableDiffusion | 22,000 | 43 | 14 | 12 |
+| r/OpenSourceAI, r/SelfHostedAI | 1,000 | 3 | 1 | 0 |
+
+What people asked for, and what changed because of it:
+
+- **"Can you swap your own workflows in?"** → Settings → Recipes & texts now has an *Import an API workflow* button (see Architecture).
+- **"What about 8 GB of VRAM?"** (the most upvoted question) → lighter presets for smaller cards are the next step; until then the README says plainly that the recipes are sized for 32 GB.
+- **"Does it run on several GPUs?"** → one studio per GPU works today (each with its own port, data folder and ComfyUI); a single queue feeding several cards is planned.
+- **"The provenance tracking alone is a killer feature"** → every render keeps its recipe, seed, LoRAs and final prompt, and now also its automatic clip check.
+
+A fork built around reference-driven video has been announced. Forks are welcome: the license is Apache-2.0, keep the notice and a credit.
 
 ## Content policy
 

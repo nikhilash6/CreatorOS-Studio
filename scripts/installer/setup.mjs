@@ -409,14 +409,30 @@ function etatModeles(comfyDir) {
   }
 }
 
-async function choisirGroupes(modeles) {
+/* « Ta carte peut-elle le faire ? » (27/10) : estimation, pas mesure. Le plus gros modèle
+   de diffusion du groupe doit tenir en VRAM, plus ~3 Go pour les activations et le VAE ;
+   ComfyUI décharge les encodeurs de texte. Sous 75 % du besoin, le déchargement partiel
+   devient trop lent ou finit en manque de mémoire. */
+const DIFFUSION = new Set(['diffusion_models', 'unet', 'checkpoints', 'unet_gguf'])
+function besoinVram(modeles, g) {
+  const gros = Math.max(0, ...modeles.filter(m => m.groupes.includes(g) && DIFFUSION.has(m.dossier)).map(m => m.taille))
+  return gros ? gros + 3e9 : 0
+}
+function verdictVram(besoin, vram) {
+  if (!besoin || !vram) return ''
+  const t = `≈ ${Math.ceil(besoin / 1e9)} GB VRAM`
+  return vram >= besoin ? vert(`${t}, fits your card`) : vram >= 0.75 * besoin ? jaune(`${t}, tight: slow, may run out of memory`) : rouge(`${t}, likely too big for your ${Math.round(vram / 1e9)} GB card`)
+}
+
+async function choisirGroupes(modeles, vram) {
   const noms = Object.keys(MANIFESTE.groupes)
   const lignes = noms.map((g, i) => {
     const du = modeles.filter(m => m.groupes.includes(g))
     const manque = du.filter(m => !m.present)
     const taille = manque.reduce((s, m) => s + m.taille, 0)
     const etat = manque.length ? jaune(`${manque.length}/${du.length} missing, ${octets(taille)}`) : vert('complete')
-    return `   ${String(i + 1).padStart(2)}. ${g.padEnd(15)} ${MANIFESTE.groupes[g].label}\n       ${etat}`
+    const v = verdictVram(besoinVram(modeles, g), vram)
+    return `   ${String(i + 1).padStart(2)}. ${g.padEnd(15)} ${MANIFESTE.groupes[g].label}\n       ${etat}${v ? `  ·  ${v}` : ''}`
   })
   console.log(lignes.join('\n'))
   const imposes = valeur('--groups')
@@ -431,12 +447,12 @@ async function choisirGroupes(modeles) {
   return [...new Set(r.split(/[\s,]+/).map(Number).filter(n => n >= 1 && n <= noms.length).map(n => noms[n - 1]))]
 }
 
-async function etapeGroupes(comfy) {
+async function etapeGroupes(comfy, vram) {
   titre('3. Features')
   const etat = etatModeles(comfy.dir)
   if (etat.extra.length) info(`extra_model_paths.yaml: ${etat.extra.map(s => `${s.nom} → ${tilde(s.base)}${s.defaut ? ' (default)' : ''}`).join(', ')}`)
   for (const e of controlerManifeste()) alerte(e)
-  return { ...etat, groupes: await choisirGroupes(etat.modeles) }
+  return { ...etat, groupes: await choisirGroupes(etat.modeles, vram) }
 }
 
 async function etapeModeles({ modeles, groupes }) {
@@ -611,7 +627,7 @@ async function principal() {
   let groupes = null
   if (comfy) {
     // Le choix des fonctions vient d'abord : il décide des packs ET des modèles.
-    const etat = await etapeGroupes(comfy)
+    const etat = await etapeGroupes(comfy, p.gpu?.vram)
     groupes = etat.groupes
     await etapeNoeuds(comfy, p, groupes)
     await etapeModeles(etat)

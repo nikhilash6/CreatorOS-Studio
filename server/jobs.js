@@ -16,6 +16,7 @@ import * as sdk from './transport-sdk.js'
 import * as store from './db.js'
 import { identityPreambleFor, lorasPhoto, persona, personaDuDepot, triggerPrefix } from './persona.js'
 import { ensurePoster } from './poster.js'
+import { controlerJob } from './controle.js'
 import * as wildcards from './wildcards.js'
 import * as vision from './vision.js'
 import { t0Hit } from './t0.js'
@@ -812,6 +813,8 @@ export function enqueue(job) {
        depuis un plan de carrousel doit repartir de lui, pas de la
        paraphrase VLM du plan (cf. server/carrousel.js). */
     promptRacine: typeof job.promptRacine === 'string' && job.promptRacine.trim() ? job.promptRacine.trim() : null,
+    // nouvelle prise lancée par le contrôle automatique (server/controle.js) : jamais relancée à son tour
+    priseDe: typeof job.priseDe === 'string' && job.priseDe ? job.priseDe : null,
   }
   // Estimation de durée, calculée ici et portée par le job (payload) : la
   // barre « écoulé / estimé » des interfaces s'en sert.
@@ -1113,7 +1116,7 @@ const INPAINT_VIDEO_MAX_IMAGES = 161
    trouve d'après `cible` (« dress », « sunglasses »…) sur chaque image et la suit ;
    le prompt dit ce qui doit s'y trouver. Rien à modifier si la cible n'est pas à
    l'image : on ne fait pas apparaître un objet absent. */
-export function enqueueInpaintVideo({ sourceFile, maskFile, parentAssetId, prompt, strength, suivi, cible }) {
+export function enqueueInpaintVideo({ sourceFile, maskFile, parentAssetId, prompt, strength, suivi, cible, inverser, retirer }) {
   if (t0Hit(`${prompt ?? ''} ${cible ?? ''}`)) throw new Error('prompt refusé (liste T0)')
   const zoneTexte = String(cible ?? '').trim().slice(0, 80) || null
   if (!maskFile && !zoneTexte) throw new Error('rien à éditer : ni zone peinte ni élément à modifier')
@@ -1126,6 +1129,10 @@ export function enqueueInpaintVideo({ sourceFile, maskFile, parentAssetId, promp
     mode: 'video', purpose: 'creative', recipeId: 'inpaint_video@v1', workflowFile: REFINE_MASKED_RECIPE,
     seed: Math.floor(Math.random() * 0xffffffffffff), op: 'inpaint_video', videoEngine: null,
     sourceImage: null, inpaintVideo: sourceFile, inpaintMask: maskFile ?? null, inpaintSuivi: suivi !== false, inpaintCible: zoneTexte,
+    // « changer le fond » : on suit la personne et on redessine tout SAUF elle (masque inversé)
+    inpaintInverser: !!inverser && !!zoneTexte,
+    // « retirer » : la zone est d'abord brouillée avec les couleurs voisines, sinon le modèle redessine l'objet
+    inpaintRetirer: !!retirer && !!zoneTexte && !inverser,
     inpaintDenoise: Number.isFinite(strength) ? Math.min(1, Math.max(0.3, strength)) : INPAINT_VIDEO_DENOISE,
     parentAssetId: parentAssetId ?? null,
     userPrompt: String(prompt ?? '').trim() || null, userDirectives: null,
@@ -1152,6 +1159,11 @@ async function runInpaintVideo(job, t0) {
     // édition au prompt : SAM3 détecte et suit l'élément nommé, image par image
     g.cface.inputs.text = job.inpaintCible
     zone = ['m0', 0]
+    if (job.inpaintInverser) {
+      g.trk.inputs.max_objects = 4
+      g.inp_inv = { class_type: 'InvertMask', inputs: { mask: ['m0', 0] } }
+      zone = ['inp_inv', 0]
+    }
   } else {
   g.inp_peint = { class_type: 'LoadImage', inputs: { image: job.inpaintMask } }
   g.inp_masque = { class_type: 'ImageToMask', inputs: { image: ['inp_peint', 0], channel: 'red' } }
@@ -1171,7 +1183,20 @@ async function runInpaintVideo(job, t0) {
   }
   }
   g.mg.inputs.mask = zone; g.mg.inputs.expand = 12
-  g.inp_bord = { class_type: 'GrowMaskWithBlur', inputs: { mask: zone, expand: 14, incremental_expandrate: 0, tapered_corners: true,
+  if (job.inpaintRetirer) {
+    /* Pré-remplissage : l'image réduite à 24 px puis agrandie et floutée ne garde que les
+       couleurs du décor ; collée dans la zone (élargie), elle efface l'objet avant l'encodage.
+       Le modèle redessine alors du décor au lieu de retrouver l'objet dans le latent. */
+    g.mg.inputs.expand = 40     // avale aussi ce qui « appelle » l'objet (une soucoupe redessine une tasse)
+    g.inp_taille = { class_type: 'GetImageSizeAndCount', inputs: { image: ['20', 0] } }
+    g.inp_mini = { class_type: 'ImageScale', inputs: { image: ['20', 0], upscale_method: 'area', width: 24, height: 0, crop: 'disabled' } }
+    g.inp_maxi = { class_type: 'ImageScale', inputs: { image: ['inp_mini', 0], upscale_method: 'bilinear', width: ['inp_taille', 1], height: ['inp_taille', 2], crop: 'disabled' } }
+    g.inp_lisse = { class_type: 'ImageBlur', inputs: { image: ['inp_maxi', 0], blur_radius: 31, sigma: 10 } }
+    g.inp_efface = { class_type: 'ImageCompositeMasked', inputs: { destination: ['20', 0], source: ['inp_lisse', 0], x: 0, y: 0, resize_source: false, mask: ['mg', 0] } }
+    g['21'].inputs.pixels = ['inp_efface', 0]
+    if (g['9']?.inputs) g['9'].inputs.text = `${job.inpaintCible}, ${g['9'].inputs.text ?? ''}`.replace(/, $/, '')
+  }
+  g.inp_bord = { class_type: 'GrowMaskWithBlur', inputs: { mask: zone, expand: job.inpaintRetirer ? 40 : 14, incremental_expandrate: 0, tapered_corners: true,
     flip_input: false, blur_radius: 6, lerp_alpha: 1, decay_factor: 1, fill_holes: false } }
   g.inp_colle = { class_type: 'ImageCompositeMasked', inputs: { destination: ['20', 0], source: ['14', 0], x: 0, y: 0, resize_source: false, mask: ['inp_bord', 0] } }
   g['15'].inputs.images = ['inp_colle', 0]
@@ -1179,7 +1204,7 @@ async function runInpaintVideo(job, t0) {
   const promptId = await comfy.submitPrompt(g, CLIENT_ID)
   current = { jobId: job.id, promptId }
   store.markStarted(job.id, promptId)
-  const mode = job.inpaintCible ? `édition au prompt (SAM3 « ${job.inpaintCible} »)` : job.inpaintSuivi ? 'suivi SAM3' : 'zone fixe'
+  const mode = job.inpaintRetirer ? `retrait (SAM3 « ${job.inpaintCible} », zone pré-effacée)` : job.inpaintInverser ? `nouveau fond (tout sauf SAM3 « ${job.inpaintCible} »)` : job.inpaintCible ? `édition au prompt (SAM3 « ${job.inpaintCible} »)` : job.inpaintSuivi ? 'suivi SAM3' : 'zone fixe'
   console.log(`[job ${job.id}] PINCEAU VIDÉO ${mode} denoise ${g['12'].inputs.denoise} sur ${job.inpaintVideo} prompt_id=${promptId}`)
   const history = await comfy.waitForPrompt(promptId, {
     onPhase: p => store.setStatus(job.id, p === 'queued' ? 'queued-comfy' : p),
@@ -2395,6 +2420,8 @@ async function runJob(job, isRetry = false, connRetried = false) {
     const ms = Date.now() - t0
     store.markFinished(job.id, ms)
     console.log(`[job ${job.id}] terminé en ${(ms / 1000).toFixed(1)} s — ${n} image(s)`)
+    // contrôle du clip, hors du chemin critique : la file repart sans l'attendre
+    void controlerJob(job, p => enqueue(p)).catch(e => console.warn(`[contrôle] ${String(e.message || e).slice(0, 200)}`))
   } catch (e) {
     /* ComfyUI injoignable (redémarrage, crash relancé par le superviseur) :
        ce n'est pas le job qui est en cause. On attend qu'il réponde et on

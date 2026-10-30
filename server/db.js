@@ -292,6 +292,14 @@ export function createAsset(a, prov) {
    « Cloner » possible après un rechargement de page (le Job n'est plus en
    mémoire côté front). Le workflow complet, lui, reste hors de cette vue —
    il pèse ~900 Ko et ne sert qu'à la route dédiée. */
+/* Contrôle automatique d'un clip rendu (27/10, scripts/controle_clip.py) : défauts
+   horodatés et score de visage, par asset. Créée avant ASSET_SELECT, qui la lit. */
+db.exec(`CREATE TABLE IF NOT EXISTS controles (asset_id TEXT PRIMARY KEY, job_id TEXT, data TEXT NOT NULL, at INTEGER NOT NULL)`)
+const ecrireControleStmt = db.prepare('INSERT INTO controles (asset_id, job_id, data, at) VALUES (?, ?, ?, ?) ON CONFLICT(asset_id) DO UPDATE SET data = excluded.data, at = excluded.at')
+const lireControleStmt = db.prepare('SELECT data FROM controles WHERE asset_id = ?')
+export function ecrireControle(assetId, jobId, data) { ecrireControleStmt.run(String(assetId), String(jobId), JSON.stringify(data), Date.now()) }
+export function lireControle(assetId) { try { return JSON.parse(lireControleStmt.get(String(assetId))?.data ?? 'null') } catch { return null } }
+
 const ASSET_SELECT = `
 SELECT a.*, p.recipe_id, p.seed, p.composed_positive, p.composed_negative,
        p.user_prompt, p.user_directives, p.selections,
@@ -311,7 +319,8 @@ SELECT a.*, p.recipe_id, p.seed, p.composed_positive, p.composed_negative,
        json_extract(j.payload, '$.t2v') AS t2v,
        json_extract(j.payload, '$.photoEngine') AS photo_engine,
        json_extract(j.payload, '$.op') AS job_op,
-       (SELECT json_group_array(folder_id) FROM folder_assets fa WHERE fa.asset_id = a.id) AS folder_ids
+       (SELECT json_group_array(folder_id) FROM folder_assets fa WHERE fa.asset_id = a.id) AS folder_ids,
+       (SELECT data FROM controles c WHERE c.asset_id = a.id) AS controle
 FROM assets a LEFT JOIN provenance p ON p.asset_id = a.id
               LEFT JOIN jobs j ON j.id = a.job_id`
 
