@@ -134,6 +134,16 @@ function CaptionCard({ asset }: { asset: Asset }) {
   )
 }
 
+/** Looks en un clic : des consignes de retouche prêtes (Qwen-Image-Edit 2511), personnage et cadrage gardés. */
+const LOOKS = [
+  { id: 'or', label: 'Heure dorée', consigne: 'Relight the photo to warm golden hour sunlight with long soft shadows. Keep the person, pose, outfit and framing unchanged.' },
+  { id: 'nuit', label: 'Nuit', consigne: 'Turn the scene into night time with warm city lights and soft moonlight. Keep the person, pose, outfit and framing unchanged.' },
+  { id: 'peluche', label: 'Peluche', consigne: 'Turn the person into a cute soft plush toy with the same hair and outfit colours, visible fabric texture and stitching, sitting in the same place.' },
+  { id: 'figurine', label: 'Figurine', consigne: 'Turn the photo into a collectible 3D figurine of the same person and outfit, standing on a round base on a desk, with its toy packaging box beside it.' },
+  { id: 'bd', label: 'BD', consigne: 'Redraw the photo as a vibrant comic book panel with bold ink outlines, flat colours and halftone shading. Same person, pose and framing.' },
+  { id: 'argile', label: 'Pâte à modeler', consigne: 'Turn the whole scene into stop-motion clay animation style, plasticine textures and fingerprints. Same person, pose and framing.' },
+]
+
 export function Viewer({ asset, list, onGo, onClose, goVideo, goImage }: {
   asset: Asset
   list: Asset[]
@@ -197,6 +207,24 @@ export function Viewer({ asset, list, onGo, onClose, goVideo, goImage }: {
   const [carousel, setCarousel] = useState(false)
   const p = asset.provenance
 
+  /* « Ouvrir dans ComfyUI » (30/10) : le graphe exact du rendu en .json, et ses modèles avec leur licence */
+  const [modeles, setModeles] = useState<{ fichier: string; licence: string | null }[] | null>(null)
+  const lancerLook = async (consigne: string) => {
+    await s.retouchFrom(asset)
+    s.setUserPrompt(consigne)
+    useAppStore.setState({ promptTouched: true, composedPositive: '' })
+    await s.submitJob()
+    onClose(); goImage()
+  }
+  const telechargerGraphe = async () => {
+    const r = await fetch(`/api/assets/${encodeURIComponent(asset.id)}/workflow`)
+    if (!r.ok) { setModeles([]); return }
+    const d = await r.json()
+    setModeles(d.modeles ?? [])
+    const url = URL.createObjectURL(new Blob([JSON.stringify(d.workflow, null, 1)], { type: 'application/json' }))
+    const lien = document.createElement('a'); lien.href = url; lien.download = `${asset.id}-workflow-api.json`; lien.click()
+    setTimeout(() => URL.revokeObjectURL(url), 5000)
+  }
   const loadProv = async () => {
     const r = await fetch(`/api/assets/${encodeURIComponent(asset.id)}/provenance`)
     setProv(JSON.stringify(await r.json(), null, 1))
@@ -281,7 +309,14 @@ export function Viewer({ asset, list, onGo, onClose, goVideo, goImage }: {
               </b>
             </div>
           ))}
-          <button className="text-[10px] mt-1" style={{ color: 'var(--muted)', background: 'none', border: 0, cursor: 'pointer' }} onClick={() => void loadProv()}>{t('provenance complète…')}</button>
+          <div className="flex gap-3 items-center mt-1">
+            <button className="text-[10px]" style={{ color: 'var(--muted)', background: 'none', border: 0, cursor: 'pointer' }} onClick={() => void loadProv()}>{t('provenance complète…')}</button>
+            <button className="text-[10px]" style={{ color: 'var(--muted)', background: 'none', border: 0, cursor: 'pointer' }}
+              title={t('Le graphe exact de ce rendu, à glisser dans ComfyUI')} onClick={() => void telechargerGraphe()}>{t('⤓ workflow ComfyUI')}</button>
+          </div>
+          {modeles && <div className="mt-1 text-[10px]" style={{ color: 'var(--muted)', lineHeight: 1.5 }}>
+            {modeles.length ? modeles.map(m => <div key={m.fichier}>{m.fichier.replace(/\.(safetensors|gguf)$/, '')} · {m.licence ?? t('licence : voir la fiche du modèle')}</div>) : t('aucun modèle nommé dans ce graphe')}
+          </div>}
           {prov && <pre className="mt-1 text-[9px] max-h-[120px] overflow-auto" style={{ color: 'var(--faint)' }}>{prov}</pre>}
         </div>
         <PileLoras loras={loras} charge />
@@ -324,6 +359,14 @@ export function Viewer({ asset, list, onGo, onClose, goVideo, goImage }: {
           {asset.mediaType === 'photo' && (<>
             <button className="b2" onClick={() => { void s.retouchFrom(asset); onClose(); goImage() }}>{t('✎ Éditer (retouche)')}</button>
             <button className="b2" onClick={() => setPinceau(true)} title={t('peindre une zone et la refaire, le reste de l\'image ne change pas')}>{t('🖌 Pinceau')}</button>
+            {/* Looks en un clic (30/10) : une retouche Qwen-Image-Edit à consigne prête, lancée tout de suite */}
+            <div className="flex gap-1.5 items-center flex-wrap text-[10.5px]" style={{ color: 'var(--muted)' }}>
+              {t('Look')}
+              {LOOKS.map(l => (
+                <button key={l.id} className="pill" style={{ fontSize: 10.5, padding: '4px 9px' }} title={l.consigne}
+                  onClick={() => void lancerLook(l.consigne)}>{t(l.label)}</button>
+              ))}
+            </div>
           </>
 )}
           <div className="flex gap-1.5">

@@ -26,7 +26,7 @@ import { T0_BLOCKLIST, t0Hit } from './t0.js'
 import { persona, personas, identityPreambleFor, enregistrer as enregistrerPersona, champsFiges, creer as creerPersona, activer as activerPersona, supprimer as supprimerPersona } from './persona.js'
 import { lireCreateur, ecrireCreateur } from './createur.js'
 import { etatCloud, importerCloud, tacheCloud } from './cloud-loras.js'
-import { enqueueParole, enqueueReshoot, sceneReshoot, deposerAvecCle, enqueue, enqueueParPlans, enqueueInpaint, enqueueInpaintVideo, enqueueUpscale, enqueueFinition, enqueuePhotoHd, cancelJob, promoteJob, reorderQueue, RENDER_RATES, driverMeta, recoverQueue, queueDepth, placeDansFile, RECIPES, VIDEO_ENGINES, recettesServies, DEFAULT_VIDEO_ENGINE, MOTION_RECIPES, DEPRECATED_RECIPES } from './jobs.js'
+import { enqueueParole, enqueueReshoot, enqueueCleanPlate, sceneReshoot, deposerAvecCle, enqueue, enqueueParPlans, enqueueInpaint, enqueueInpaintVideo, enqueueUpscale, enqueueFinition, enqueuePhotoHd, cancelJob, promoteJob, reorderQueue, RENDER_RATES, driverMeta, recoverQueue, queueDepth, placeDansFile, RECIPES, VIDEO_ENGINES, recettesServies, DEFAULT_VIDEO_ENGINE, MOTION_RECIPES, DEPRECATED_RECIPES } from './jobs.js'
 import { diagnostiquer, figerNoeuds, resumeDiagnostic } from './diagnostic.js'
 import * as montage from './montage.js'
 import * as reel from './reel.js'
@@ -1738,6 +1738,29 @@ app.post('/api/assets/:id/to-input', async (req, reply) => {
   return { filename, width: row.width, height: row.height }
 })
 
+/* « Ouvrir dans ComfyUI » (30/10) : le graphe exact envoyé pour ce rendu, au format API,
+   à glisser dans ComfyUI ; chemins absolus réduits au nom du fichier. Avec la liste des
+   modèles qu'il charge et leur licence, lue dans le manifeste de l'assistant. */
+const MANIFESTE_MODELES = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', 'scripts', 'installer', 'modeles.json'), 'utf8')).modeles
+app.get('/api/assets/:id/workflow', async (req, reply) => {
+  const p = store.getProvenance(req.params.id)
+  const wf = p && parse(p.workflow_json)
+  if (!wf || typeof wf !== 'object') { reply.code(404); return { error: 'pas de graphe enregistré pour ce rendu' } }
+  const modeles = new Map()
+  const nettoyer = v => typeof v === 'string' && /^(\/|[A-Za-z]:\\)/.test(v) ? path.basename(v) : v
+  for (const n of Object.values(wf)) {
+    if (!n?.inputs) continue
+    for (const [k, v] of Object.entries(n.inputs)) {
+      n.inputs[k] = nettoyer(v)
+      if (typeof v === 'string' && /\.(safetensors|gguf|pth|onnx|pt)$/.test(v)) {
+        const m = MANIFESTE_MODELES.find(x => x.chemin.split('/').pop() === v.split('/').pop())
+        modeles.set(v.split('/').pop(), m?.licence ?? null)
+      }
+    }
+  }
+  return { assetId: p.asset_id, recette: p.recipe_id, workflow: wf, modeles: [...modeles].map(([fichier, licence]) => ({ fichier, licence })) }
+})
+
 app.get('/api/assets/:id/provenance', async (req, reply) => {
   const p = store.getProvenance(req.params.id)
   if (!p) { reply.code(404); return { error: 'provenance inconnue' } }
@@ -1860,6 +1883,15 @@ app.post('/api/assets/:id/edit-video', async (req, reply) => {
   let prompt = String(req.body?.prompt ?? '').trim(), cible = String(req.body?.cible ?? '').trim()
   let strength = Number(req.body?.strength)
   if (mode === 'fond') cible = cible || 'person'
+  /* Retirer (30/10) : IC-LoRA LTX-2.5 Clean-Plate — personnes, passants, véhicules ;
+     le décor est reconstruit derrière, le son d'origine gardé (cf. enqueueCleanPlate). */
+  if (mode === 'retirer') {
+    try {
+      const r = deposerAvecCle(cleComfy(req), () => enqueueCleanPlate({ source: path.basename(src), cible: cible || 'people', decor: prompt,
+        parentAssetId: a.id, personaId: a.persona_id }))
+      return { jobId: r.id }
+    } catch (e) { reply.code(400); return { error: String(e.message || e) } }
+  }
   if (!cible) { reply.code(400); return { error: 'dis quel élément modifier (ex. « dress »)' } }
   if (mode === 'retirer') {
     // l'élément disparaît : on redessine sa zone en décor, plus fort qu'une simple modification

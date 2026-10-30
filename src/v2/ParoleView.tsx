@@ -23,6 +23,11 @@ export function ParoleView({ goVideo }: { goVideo: () => void }) {
   const [enreg, setEnreg] = useState<{ rec: MediaRecorder; t0: number } | null>(null)
   const [secondes, setSecondes] = useState(0)
   const morceaux = useRef<Blob[]>([])
+  /* Réplique écrite (30/10) : LTX-2.5 fait la voix et les lèvres d'un coup, sans fichier audio.
+     Ouverte aux visiteurs (rien n'est envoyé d'autre qu'une phrase) ; la voix enregistrée
+     (InfiniteTalk) reste au propriétaire. */
+  const [source, setSource] = useState<'replique' | 'voix'>(edition ? 'voix' : 'replique')
+  const [replique, setReplique] = useState('')
   // « Utiliser dans… » depuis la visionneuse : ce visage est déjà choisi
   useEffect(() => { const a = useAppStore.getState().prendrePasserelle('parole'); if (a) setPhoto(a) }, [])
 
@@ -77,6 +82,28 @@ export function ParoleView({ goVideo }: { goVideo: () => void }) {
     setBusy(false)
   }
 
+  const lancerReplique = async () => {
+    const r = replique.trim()
+    if (!photo || !r) return
+    setBusy(true); setErr(null)
+    try {
+      const { filename } = await json(await fetch(`/api/assets/${encodeURIComponent(photo.id)}/to-input`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }))
+      // ~2,5 mots par seconde de parole, plus une respiration ; le moteur borne la durée
+      const secondes = Math.max(4, Math.min(8, Math.ceil(r.split(/\s+/).length / 2.5 + 1.5)))
+      const ligne = r.replace(/"/g, "'")
+      const id = `say-${Date.now().toString(36)}`
+      const j = await json(await fetch('/api/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+        id, mode: 'video', register: 'sfw', purpose: 'creative', personaId: photo.personaId ?? undefined,
+        videoEngine: 'ltx_hq', withAudio: true, sourceImage: filename, videoSeconds: secondes,
+        userPrompt: r, composedNegative: '',
+        composedPositive: `${texte.trim() ? `${texte.trim()}. ` : ''}She looks into the camera and says, in a natural clear voice: "${ligne}" Her lips move in sync with her words, small natural head movements, static camera, single continuous shot, no music.`,
+      }) }))
+      void s.adoptServerJob(j.id ?? id)
+      setFait(t('{d} s de vidéo parlée', { d: secondes }))
+    } catch (e) { setErr(String((e as Error).message)) }
+    setBusy(false)
+  }
+
   return (
     <div className="flex-1 min-h-0 overflow-y-auto vue-page" style={{ padding: '22px 28px' }}>
       <div style={{ maxWidth: 980, margin: '0 auto', display: 'grid', gap: 16 }}>
@@ -96,8 +123,20 @@ export function ParoleView({ goVideo }: { goVideo: () => void }) {
           </div>
         </div>
         <div style={{ display: 'grid', gap: 10, padding: 16, borderRadius: 16, background: 'var(--lv1)' }}>
-          <b style={{ fontSize: 13 }}>{t('2. La voix (20 s au plus)')}</b>
           <div className="flex items-center gap-2 flex-wrap">
+            <b style={{ fontSize: 13 }}>{t('2. Ce qu’elle dit')}</b>
+            <span className="wtabs" style={{ marginLeft: 'auto' }}>
+              <button className={`wtab ${source === 'replique' ? 'on' : ''}`} onClick={() => setSource('replique')}>{t('Une phrase écrite')}</button>
+              <button className={`wtab ${source === 'voix' ? 'on' : ''}`} onClick={() => setSource('voix')}>{t('Ta voix (20 s au plus)')}</button>
+            </span>
+          </div>
+          {source === 'replique' && <>
+            <textarea value={replique} onChange={e => setReplique(e.target.value)} maxLength={220} rows={2}
+              placeholder={t('La phrase qu’elle dit, dans sa langue (ex. « Hi! This is my favourite café in Paris, you have to try the croissants. »)')}
+              style={{ padding: '9px 11px', borderRadius: 10, background: 'var(--lv2)', border: '1px solid var(--lv3)', color: 'var(--text)', font: 'inherit', fontSize: 13 }} />
+            <span style={{ fontSize: 11.5, color: 'var(--faint)' }}>{t('LTX-2.5 fait la voix et le mouvement des lèvres en un seul rendu, 4 à 8 s selon la longueur de la phrase.')}</span>
+          </>}
+          {source === 'voix' && <div className="flex items-center gap-2 flex-wrap">
             {!edition && <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{t('Sur la démo publique, la voix ne peut pas être envoyée : l’avatar parlant est réservé au propriétaire.')}</span>}
             {edition && <><button className={`pill ${enreg ? 'used' : ''}`} onClick={() => void micro()}>{enreg ? `■ ${t('Arrêter')} · ${secondes.toFixed(1)} s` : `🎙 ${t('Enregistrer au micro')}`}</button>
             <label className="pill tool" style={{ cursor: 'pointer' }}>⇪ {t('déposer un fichier audio')}
@@ -105,12 +144,12 @@ export function ParoleView({ goVideo }: { goVideo: () => void }) {
             </label></>}
             {voix && <audio src={voix.url} controls style={{ height: 32 }} />}
             {voix && <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{voix.duree.toFixed(1)} s</span>}
-          </div>
+          </div>}
           <input value={texte} onChange={e => setTexte(e.target.value)} maxLength={400} placeholder={t('Optionnel : son attitude pendant qu’elle parle (en anglais, ex. « smiling, enthusiastic, holding a coffee cup »)')}
             style={{ padding: '9px 11px', borderRadius: 10, background: 'var(--lv2)', border: '1px solid var(--lv3)', color: 'var(--text)', font: 'inherit', fontSize: 12.5 }} />
         </div>
         <div className="flex items-center gap-3">
-          <button className="cta" style={{ padding: '11px 20px', flexDirection: 'row' }} disabled={!photo || !voix || busy} onClick={() => void lancer()}>{busy ? '…' : `✨ ${t('Faire parler')}`}</button>
+          <button className="cta" style={{ padding: '11px 20px', flexDirection: 'row' }} disabled={!photo || busy || (source === 'voix' ? !voix : !replique.trim())} onClick={() => void (source === 'voix' ? lancer() : lancerReplique())}>{busy ? '…' : `✨ ${t('Faire parler')}`}</button>
           {fait && <span style={{ fontSize: 12.5 }}>✓ {t('En file de rendu')} — {fait}. <button className="pill tool" onClick={goVideo}>{t('Aller à Vidéo')}</button></span>}
           {err && <span style={{ fontSize: 12, color: 'var(--danger)' }}>{err}</span>}
         </div>

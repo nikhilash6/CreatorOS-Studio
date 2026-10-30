@@ -27,10 +27,18 @@ const DANS_COMFY = path.join(CONFIG.comfyDir ?? '', 'models', 'opencv')
 export const MODELES_CONTROLE = process.env.CREATOROS_MODELES_CONTROLE
   || (fs.existsSync(path.join(DANS_COMFY, 'face_recognition_sface_2021dec.onnx')) ? DANS_COMFY : path.join(CONFIG.dataDir, 'modeles-controle'))
 
+/* Mouvement de caméra attendu par preset (30/10) : vérifié par le flux optique, en avertissement.
+   Les presets enchaînés (jib-down) et les mouvements composés (orbite, arc…) ne sont pas lus. */
+const MOUVEMENT_PRESET = {
+  'push-in': 'avant', 'crash-zoom': 'avant', 'pull-out': 'arriere', 'crash-zoom-out': 'arriere',
+  'travelling-lateral': 'lateral', panoramique: 'lateral', drone: 'vertical', 'grue-haute': 'vertical', 'fixe-vivant': 'fixe',
+}
+
 /** Contrôle un clip ; rend le résultat du script, ou null si le contrôle est indisponible. */
-export async function controlerClip(clip, ref) {
+export async function controlerClip(clip, ref, mouvement) {
   const args = [SCRIPT, clip, '--modeles', MODELES_CONTROLE]
   if (ref && fs.existsSync(ref)) args.push('--ref', ref)
+  if (mouvement) args.push('--mouvement', mouvement)
   try {
     // le Python de ComfyUI a OpenCV ; à défaut, celui du système (le contrôle se dit alors indisponible s'il n'a pas cv2)
     const py = fs.existsSync(CONFIG.comfyPython) ? CONFIG.comfyPython : 'python3'
@@ -53,7 +61,7 @@ export async function controlerJob(job, relancer) {
   const assets = store.assetsOfJob(job.id).filter(a => a.media_type === 'video' && !String(a.filename).includes('-montage-'))
   const ref = job.sourceImage ? path.join(CONFIG.comfyInput, path.basename(String(job.sourceImage))) : null
   for (const a of assets) {
-    const c = await controlerClip(path.join(CONFIG.mediaDir, a.filename), ref)
+    const c = await controlerClip(path.join(CONFIG.mediaDir, a.filename), ref, MOUVEMENT_PRESET[job.presetId])
     if (!c) continue
     const g = graves(c)
     c.prise = job.priseDe ? 2 : 1

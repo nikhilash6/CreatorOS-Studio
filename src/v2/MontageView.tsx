@@ -86,6 +86,55 @@ export function MontageView({ onOpen, ouvrirId }: { onOpen: (a: Asset, list: Ass
   useEffect(() => { if (ouvrirId) void ouvrir(ouvrirId) }, [ouvrirId]) // eslint-disable-line react-hooks/exhaustive-deps
   const maj = (f: (d: Donnees) => Donnees) => setProjet(p => p && { ...p, data: f(p.data) })
   const majPlan = (i: number, patch: Partial<Plan>) => maj(d => ({ ...d, clips: d.clips.map((c, k) => k === i ? { ...c, ...patch } : c) }))
+  /* Transition générée (30/10) : Wan 2.2 relie la dernière image d'un plan à la première du
+     suivant (WanFirstLastFrameToVideo) ; le clip rendu est inséré entre les deux, en coupes franches.
+     Clé = le plan de départ (son asset), pour retrouver sa place si l'ordre a bougé entre-temps. */
+  const [transitions, setTransitions] = useState<Record<string, { jobId: string; vers: string }>>({})
+  // gardées par projet dans le navigateur : quitter la page pendant le rendu ne perd pas l'insertion
+  const cleTrans = projet ? `creatoros-transitions-${projet.id}` : null
+  useEffect(() => {
+    if (!cleTrans) return
+    try { setTransitions(JSON.parse(localStorage.getItem(cleTrans) ?? '{}')) } catch { setTransitions({}) }
+  }, [cleTrans])
+  useEffect(() => {
+    if (!cleTrans) return
+    try { if (Object.keys(transitions).length) localStorage.setItem(cleTrans, JSON.stringify(transitions)); else localStorage.removeItem(cleTrans) } catch { /* stockage refusé */ }
+  }, [cleTrans, transitions])
+  const genererTransition = async (i: number) => {
+    if (!projet) return
+    const A = projet.data.clips[i], B = projet.data.clips[i + 1]
+    const aA = assets[A?.assetId], aB = assets[B?.assetId]
+    if (!aA || !aB) return
+    setErr(null)
+    try {
+      const cadre = async (a: Asset, quelle: 'last' | 'first') => (await json(await fetch(`/api/assets/${encodeURIComponent(a.id)}/to-input${a.mediaType === 'video' ? `?frame=${quelle}` : ''}`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }))).filename as string
+      const [debut, fin] = [await cadre(aA, 'last'), await cadre(aB, 'first')]
+      const id = `trans-${Date.now().toString(36)}`
+      const r = await json(await fetch('/api/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+        id, mode: 'video', register: 'sfw', purpose: 'creative', personaId: aA.personaId ?? undefined,
+        videoEngine: 'wan', withAudio: false, sourceImage: debut, endImage: fin, videoSeconds: 3,
+        userPrompt: 'transition', composedNegative: '',
+        composedPositive: 'A seamless cinematic transition: the first shot flows and morphs continuously into the second shot in one fluid camera movement, consistent light, no cut, no text.',
+      }) }))
+      void s.adoptServerJob(r.id ?? id)
+      setTransitions(x => ({ ...x, [A.assetId]: { jobId: r.id ?? id, vers: B.assetId } }))
+    } catch (e) { setErr(String((e as Error).message)) }
+  }
+  // dès que le clip de transition arrive dans la bibliothèque, il prend sa place dans le montage
+  useEffect(() => {
+    for (const [de, { jobId, vers }] of Object.entries(transitions)) {
+      const clip = s.assets.find(a => a.jobId === jobId && a.mediaType === 'video')
+      if (!clip) continue
+      setTransitions(x => { const y = { ...x }; delete y[de]; return y })
+      maj(dd => {
+        const i = dd.clips.findIndex((c, k) => c.assetId === de && dd.clips[k + 1]?.assetId === vers)
+        if (i < 0) return { ...dd, clips: [...dd.clips, { assetId: clip.id, debut: 0, fin: null, duree: 3, texte: '', textePos: 'bas', transition: 'coupe', transitionDuree: 0.5 }] }
+        const clips = dd.clips.map((c, k) => k === i ? { ...c, transition: 'coupe' as const } : c)
+        return { ...dd, clips: [...clips.slice(0, i + 1), { assetId: clip.id, debut: 0, fin: null, duree: 3, texte: '', textePos: 'bas', transition: 'coupe', transitionDuree: 0.5 }, ...clips.slice(i + 1)] }
+      })
+    }
+  }, [s.assets, transitions])  // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Un plan peut venir d'un rendu absent de la bibliothèque chargée (autre
      personnage, au-delà de la page chargée) : on va le chercher au serveur. */
@@ -385,6 +434,9 @@ export function MontageView({ onOpen, ouvrirId }: { onOpen: (a: Asset, list: Ass
                     ))}
                   </div>
                   {plan.transition !== 'coupe' && <Curseur label={t('Durée du fondu')} min={0.2} max={1.5} pas={0.05} val={plan.transitionDuree} onChange={v => majPlan(sel, { transitionDuree: v })} />}
+                  <button className="pill tool" disabled={!!transitions[plan.assetId]} onClick={() => void genererTransition(sel)}
+                    title={t('Wan 2.2 dessine un passage continu de la dernière image de ce plan à la première du suivant ; le clip est inséré entre les deux')}>
+                    {transitions[plan.assetId] ? t('✨ transition en cours de rendu…') : t('✨ Transition générée (~4 min)')}</button>
                 </>)}
                 <div className="flex gap-1.5">
                   <button className="pill tool" onClick={() => maj(x => ({ ...x, clips: [...x.clips.slice(0, sel + 1), { ...plan }, ...x.clips.slice(sel + 1)] }))}>{t('Dupliquer')}</button>

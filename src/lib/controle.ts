@@ -5,6 +5,10 @@ import { t, getLang } from '../i18n'
 const nb = (x: number) => (getLang() === 'en' ? x.toFixed(1) : x.toFixed(1).replace('.', ','))
 const LIBELLE: Record<string, string> = {
   noir: 'images noires', fige: 'figé', saute: 'saute', flou: 'flou', visage: 'visage qui s’éloigne', illisible: 'clip illisible',
+  camera: 'mouvement de caméra différent',
+}
+const MOUVEMENT: Record<string, string> = {
+  avant: 'vers l’avant', arriere: 'vers l’arrière', lateral: 'latéral', vertical: 'vertical', fixe: 'immobile', mixte: 'mélangé',
 }
 
 /** Une ligne par défaut, horodatée : « figé 1,2–2,5 s ». */
@@ -22,6 +26,9 @@ export function resumeControle(c?: Controle | null): string | null {
   const morceaux = defautsDe(c)
   if (!morceaux.length) morceaux.push(t('rien à signaler'))
   if (c.visage?.score != null) morceaux.push(t('visage {s}', { s: c.visage.score.toFixed(2) }))
+  if (c.camera) morceaux.push(c.camera.mesure === c.camera.attendu
+    ? t('caméra {m} ✓', { m: t(MOUVEMENT[c.camera.mesure] ?? c.camera.mesure) })
+    : t('caméra {m} au lieu de {a}', { m: t(MOUVEMENT[c.camera.mesure] ?? c.camera.mesure), a: t(MOUVEMENT[c.camera.attendu] ?? c.camera.attendu) }))
   if (c.prise === 2) morceaux.push(c.choix === 'écartée' ? t('2e prise, écartée') : t('2e prise'))
   else if (c.relance) morceaux.push(c.choix === 'écartée' ? t('relancée, écartée') : t('relancée'))
   return morceaux.join(' · ')

@@ -702,6 +702,8 @@ export function enqueue(job) {
     prequel: mode === 'video' && !isMotion && job.prequel === true,
     // recette photo demandée (Krea 2 / FLUX.2 Klein) : décide aussi des LoRA d'identité empilées
     photoEngine: mode === 'photo' && op !== 'edit' && RECIPES_PAR_MOTEUR[job.photoEngine] ? job.photoEngine : undefined,
+    // preset de caméra ou d'effet d'origine : le contrôle des clips y lit le mouvement attendu
+    presetId: typeof job.presetId === 'string' ? job.presetId.slice(0, 40) : undefined,
     // banc basse VRAM : profil forcé pour CE job (le serveur ne le laisse passer qu'au propriétaire)
     profilVram: PROFILS.includes(Number(job.profilVram)) ? Number(job.profilVram) : undefined,
     motionDriver: isMotion ? job.motionDriver.trim() : null,
@@ -1380,6 +1382,39 @@ export function enqueueReshoot({ source, angle, azimut, elevation, cles, texte, 
   return { id, images }
 }
 
+/* Clean plate (30/10) : retirer des personnes ou des véhicules d'un clip, le décor
+   reconstruit derrière. IC-LoRA officielle LTX-2.5 Clean-Plate (Lightricks, licence
+   LTX-2.x Community) sur le même graphe que Re-shoot, guidé par le clip lui-même au
+   lieu de sa vue déplacée. Le son de la prise d'origine est gardé. */
+const CLEANPLATE_LORA = 'ltx/ltx-2.5-22b-ic-lora-clean-plate-1.0.safetensors'
+export function enqueueCleanPlate({ source, cible, decor, parentAssetId, personaId }) {
+  const c = String(cible ?? '').trim().slice(0, 80) || 'people'
+  const d = String(decor ?? '').trim().slice(0, 300)
+  if (t0Hit(`${c} ${d}`)) throw new Error('texte refusé (liste T0)')
+  if (!source || /[\\/]/.test(source) || source.startsWith('.')) throw new Error('fichier invalide')
+  const duree = videoDurationOf(path.join(CONFIG.mediaDir, source))
+  if (!duree) throw new Error('vidéo illisible')
+  const images = Math.max(25, Math.min(121, Math.floor((Math.floor(duree * 24) - 1) / 8) * 8 + 1))
+  // la forme des prompts de la fiche du modèle : le décor d'abord, puis ce qui ne doit plus y être
+  const prompt = `An empty clean plate of the exact same scene${d ? `: ${d},` : ''} with the same background, lighting and camera movement as the source video, `
+    + `but with no ${c} anywhere in the frame. No ${c}, and no cast shadows or reflections of ${c}. Photorealistic footage, high detail. Keep everything else intact.`
+  const id = `cleanplate-${Date.now().toString(36)}`
+  const row = {
+    id, createdAt: Date.now(), status: 'queued', personaId: personaId ?? persona().id, register: 'sfw',
+    mode: 'video', purpose: 'creative', recipeId: 'cleanplate@v1', workflowFile: null,
+    seed: Math.floor(Math.random() * 0xffffffffffff), op: 'cleanplate', videoEngine: 'ltx_cleanplate',
+    reshootSource: source, reshootAngle: 'clean plate', reshootCamera: { az: 0, el: 0 }, reshootImages: images,
+    parentAssetId: parentAssetId ?? null,
+    userPrompt: c, userDirectives: d || null, composedPositive: prompt, composedNegative: null,
+    selections: null, loras: [], videoLoras: [], estimatedMs: Math.round(30_000 + images * 1_000),
+  }
+  store.createJob(row)
+  retenirCle(row.id)
+  queue.push(row)
+  pump()
+  return { id, images }
+}
+
 /* Scène 3D d'un clip pour la vue Re-shoot : MoGe-2 sur la 1re image, maillage
    texturé (MoGePointMapToMesh) en GLB, à la même demi-taille que le warp — les
    angles posés à la souris tombent donc sur la géométrie que verra le nœud.
@@ -1485,6 +1520,15 @@ export function grapheReshoot(job, W, H, sonSource) {
     vid: { class_type: 'CreateVideo', inputs: { images: ['dec', 0], audio: sonSource ? ['src', 2] : ['adec', 0], fps: 24 } },
     save: { class_type: 'SaveVideo', inputs: { video: ['vid', 0], filename_prefix: `creatoros/${job.id}/reshoot`, format: 'auto', codec: 'auto' } },
   }
+  if (job.op === 'cleanplate') {
+    // clean plate : pas de géométrie ni de vue déplacée, le clip guide seul (facteur de réduction 1)
+    for (const k of ['mogem', 'moge', 'warp', 'g1']) delete g[k]
+    Object.assign(g.lora.inputs, { lora_name: CLEANPLATE_LORA, strength_model: 1 })
+    g.pos.inputs.text = String(job.composedPositive ?? '')
+    g.neg.inputs.text = `${job.userPrompt ?? 'people'}, person, figure, silhouette, ghost, blur, text, subtitles, logo, watermark`
+    g.g2.inputs.positive = ['cond', 0]; g.g2.inputs.negative = ['cond', 1]; g.g2.inputs.latent = ['lat1', 0]
+    g.save.inputs.filename_prefix = `creatoros/${job.id}/cleanplate`
+  }
   return g
 }
 
@@ -1507,7 +1551,9 @@ async function runReshoot(job, t0) {
   console.log(`[job ${job.id}] RE-SHOOT ${angle}, ${job.reshootImages} images ${W}×${H} prompt_id=${promptId}`)
   const history = await comfy.waitForPrompt(promptId, { onPhase: p => store.setStatus(job.id, p === 'queued' ? 'queued-comfy' : p) })
   const n = await harvestJob(job, promptId, history, {
-    applied: [`re-shoot : MoGe-2 → CrossViewWarp → LTX-2.5 + IC-LoRA CrossView-Warp v2 (force 1,3), ${angle}, ${job.reshootImages} images ${W}×${H}, ${sonSource ? 'son de la prise d’origine' : 'son généré'}`],
+    applied: [job.op === 'cleanplate'
+      ? `clean plate : LTX-2.5 + IC-LoRA Clean-Plate (Lightricks), « ${job.userPrompt} » retiré, ${job.reshootImages} images ${W}×${H}, ${sonSource ? 'son de la prise d’origine' : 'son généré'}`
+      : `re-shoot : MoGe-2 → CrossViewWarp → LTX-2.5 + IC-LoRA CrossView-Warp v2 (force 1,3), ${angle}, ${job.reshootImages} images ${W}×${H}, ${sonSource ? 'son de la prise d’origine' : 'son généré'}`],
     skipped: [], finalWorkflow: g,
   })
   store.markFinished(job.id, Date.now() - t0)
@@ -2178,7 +2224,7 @@ async function runJob(job, isRetry = false, connRetried = false) {
     if (job.op === 'inpaint') return await runInpaint(job, t0)
     if (job.op === 'inpaint_video') return await runInpaintVideo(job, t0)
     if (job.op === 'parole') return await runParole(job, t0)
-    if (job.op === 'reshoot') return await runReshoot(job, t0)
+    if (job.op === 'reshoot' || job.op === 'cleanplate') return await runReshoot(job, t0)
     if (job.op === 'foley' || job.op === 'interpolate') return await runFinition(job, t0)
     if (job.op === 'upscale' && job.upscaleH3)
       return await runUpscaleH3(job, t0)

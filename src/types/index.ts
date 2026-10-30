@@ -526,6 +526,8 @@ export interface Controle {
   duree?: number
   problemes: { type: string; debut: number; fin: number; detail: string; grave: boolean }[]
   visage?: { score: number | null; min?: number; mesures?: number; detail?: string } | null
+  /** Mouvement de caméra attendu (preset) et lu dans le flux optique. */
+  camera?: { attendu: string; mesure: string } | null
   prise?: number
   priseDe?: string
   relance?: string | boolean
